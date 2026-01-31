@@ -11,6 +11,7 @@ import (
 
 	"github.com/severity1/open-guard-engine/internal/agent"
 	"github.com/severity1/open-guard-engine/internal/config"
+	"github.com/severity1/open-guard-engine/internal/encoding"
 	"github.com/severity1/open-guard-engine/internal/llm"
 	"github.com/severity1/open-guard-engine/internal/patterns"
 	"github.com/severity1/open-guard-engine/internal/response"
@@ -163,8 +164,30 @@ Output is JSON with decision (allow/block/confirm) and threat details.`,
 			// Create response handler
 			respHandler := response.NewHandler(cfg)
 
+			// Layer 0: Encoding detection (decode obfuscated content)
+			encodingDetector := encoding.NewDetector()
+			encResult := encodingDetector.Detect(content)
+
+			// If suspicious encoded content found, flag immediately
+			if encResult.Suspicious {
+				output := respHandler.BuildWithModeOverrideAndSource(
+					types.DecisionConfirm,
+					types.ThreatLevelHigh,
+					types.ThreatCategoryPromptInjection,
+					types.DetectionSourcePattern,
+					fmt.Sprintf("Obfuscated injection detected (encoding: %s)", strings.Join(encResult.EncodingTypes, ", ")),
+				)
+				return outputJSON(cmd, output)
+			}
+
+			// Use decoded content for subsequent analysis if obfuscation was detected
+			analysisContent := content
+			if encResult.HasObfuscation {
+				analysisContent = encResult.DecodedContent
+			}
+
 			// Layer 1: Pattern matching (fast, deterministic)
-			results := matcher.Match("Prompt", content)
+			results := matcher.Match("Prompt", analysisContent)
 			if len(results) > 0 {
 				highestSeverity := patterns.HighestSeverity(results)
 				primaryResult := results[0]
@@ -194,7 +217,7 @@ Output is JSON with decision (allow/block/confirm) and threat details.`,
 					cfg.Agent.Endpoint,
 				)
 				if claudeAnalyzer.IsAvailable() {
-					result, err := claudeAnalyzer.Analyze(context.Background(), content)
+					result, err := claudeAnalyzer.Analyze(context.Background(), analysisContent)
 					if err == nil && !result.Safe {
 						output := respHandler.BuildWithModeOverrideAndSource(
 							types.DecisionConfirm,
@@ -215,7 +238,7 @@ Output is JSON with decision (allow/block/confirm) and threat details.`,
 					cfg.LLM.ContentSafetyModel,
 				)
 				if contentAnalyzer.IsAvailable() {
-					result, err := contentAnalyzer.Analyze(context.Background(), content)
+					result, err := contentAnalyzer.Analyze(context.Background(), analysisContent)
 					if err == nil && !result.Safe {
 						category := mapCategory(result.Categories)
 						output := respHandler.BuildWithModeOverrideAndSource(
