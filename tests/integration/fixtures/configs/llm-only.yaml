@@ -1,0 +1,10 @@
+# LLM detection mode (Ollama)
+# Uses Ollama with llama-guard3 for content safety detection (S1-S13)
+# Note: Prompt injection (T5) is handled by Agent, not LLM
+mode: confirm
+llm:
+  enabled: true
+  endpoint: http://localhost:11434
+  content_safety_model: llama-guard3:latest
+agent:
+  enabled: false

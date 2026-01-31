@@ -1,0 +1,11 @@
+# Agent detection mode (Ollama)
+# Uses Claude Code as harness with Ollama provider for prompt injection detection (T5)
+# This is a free alternative to Claude API
+mode: confirm
+llm:
+  enabled: false
+agent:
+  enabled: true
+  provider: ollama
+  model: llama3:latest
+  endpoint: http://localhost:11434

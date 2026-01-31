@@ -1,0 +1,7 @@
+# Pattern-only detection mode
+# Uses regex patterns for known injection phrases, no ML/agent
+mode: confirm
+llm:
+  enabled: false
+agent:
+  enabled: false

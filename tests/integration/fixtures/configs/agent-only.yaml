@@ -1,0 +1,9 @@
+# Agent detection mode (Claude)
+# Uses Claude Code as harness for prompt injection detection (T5)
+mode: confirm
+llm:
+  enabled: false
+agent:
+  enabled: true
+  provider: claude
+  model: claude-sonnet-4-20250514

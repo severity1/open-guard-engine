@@ -1,0 +1,335 @@
+# Threat patterns for open-guard security engine
+# Categories T1-T8 based on common AI coding assistant threats
+
+patterns:
+  # T1: Network exfiltration
+  - id: T1-001
+    category: T1
+    name: curl_wget_request
+    description: HTTP request tools that could exfiltrate data
+    severity: high
+    tools: [Bash]
+    pattern: '\b(curl|wget)\s+.*https?://[^\s]+'
+    extract:
+      domain: 'https?://([^/:]+)'
+
+  - id: T1-002
+    category: T1
+    name: netcat_connection
+    description: Netcat network connection (potential reverse shell)
+    severity: critical
+    tools: [Bash]
+    pattern: '\bnc\s+.+\s+\d{2,5}\b'
+    extract:
+      domain: '\bnc\s+.*?([a-zA-Z][a-zA-Z0-9.-]+)\s+\d+'
+
+  - id: T1-003
+    category: T1
+    name: nmap_scan
+    description: Network scanning tool
+    severity: high
+    tools: [Bash]
+    pattern: '\bnmap\s+'
+
+  # T2: Credential access
+  - id: T2-001
+    category: T2
+    name: env_file_access
+    description: Access to .env files containing secrets
+    severity: high
+    tools: [Read, Bash]
+    pattern: '\.env\b'
+
+  - id: T2-002
+    category: T2
+    name: aws_credentials
+    description: Access to AWS credential files
+    severity: critical
+    tools: [Read, Bash]
+    pattern: '\.aws/(credentials|config)\b'
+
+  - id: T2-003
+    category: T2
+    name: ssh_private_key
+    description: Access to SSH private keys
+    severity: critical
+    tools: [Read, Bash]
+    pattern: '\.ssh/id_(rsa|ed25519|ecdsa|dsa)\b'
+
+  - id: T2-004
+    category: T2
+    name: npmrc_access
+    description: Access to npm credentials
+    severity: high
+    tools: [Read, Bash]
+    pattern: '\.npmrc\b'
+
+  - id: T2-005
+    category: T2
+    name: netrc_access
+    description: Access to netrc credentials
+    severity: high
+    tools: [Read, Bash]
+    pattern: '\.netrc\b'
+
+  - id: T2-006
+    category: T2
+    name: kube_config
+    description: Access to Kubernetes config
+    severity: high
+    tools: [Read, Bash]
+    pattern: '\.kube/config\b'
+
+  - id: T2-007
+    category: T2
+    name: docker_config
+    description: Access to Docker credentials
+    severity: high
+    tools: [Read, Bash]
+    pattern: '\.docker/config\.json\b'
+
+  # T3: Command injection
+  - id: T3-001
+    category: T3
+    name: eval_execution
+    description: Eval with variable expansion
+    severity: critical
+    tools: [Bash]
+    pattern: '\beval\s+.*\$'
+
+  - id: T3-002
+    category: T3
+    name: backtick_execution
+    description: Command substitution with backticks
+    severity: high
+    tools: [Bash]
+    pattern: '`[^`]+`'
+
+  - id: T3-003
+    category: T3
+    name: dollar_paren_execution
+    description: Command substitution with $()
+    severity: medium
+    tools: [Bash]
+    pattern: '\$\([^)]+\)'
+
+  - id: T3-004
+    category: T3
+    name: pipe_to_shell
+    description: Piping content to shell interpreter
+    severity: critical
+    tools: [Bash]
+    pattern: '\|\s*(sudo\s+)?(sh|bash|zsh|fish|ksh)\b'
+
+  - id: T3-005
+    category: T3
+    name: xargs_shell
+    description: Xargs with shell execution
+    severity: high
+    tools: [Bash]
+    pattern: '\bxargs\s+.*\bsh\s+-c\b'
+
+  # T4: Filesystem attacks
+  - id: T4-001
+    category: T4
+    name: etc_write
+    description: Writing to /etc directory
+    severity: critical
+    tools: [Write, Bash]
+    pattern: '^/etc/'
+
+  - id: T4-002
+    category: T4
+    name: symlink_attack
+    description: Creating symbolic links (potential privilege escalation)
+    severity: high
+    tools: [Bash]
+    pattern: '\bln\s+-s\s+'
+
+  - id: T4-003
+    category: T4
+    name: rm_rf_root
+    description: Recursive deletion of root or home
+    severity: critical
+    tools: [Bash]
+    pattern: '\brm\s+(-[rRfF]+\s+)*(\/\s*$|~\/?\*?|\/\*|\$HOME)'
+
+  - id: T4-004
+    category: T4
+    name: chmod_sensitive
+    description: Chmod on sensitive system files
+    severity: high
+    tools: [Bash]
+    pattern: '\bchmod\s+\d+\s+/etc/'
+
+  # T5: Prompt injection
+  - id: T5-001
+    category: T5
+    name: ignore_instructions
+    description: Attempt to override AI instructions
+    severity: critical
+    tools: [Prompt]
+    pattern: '(?i)(ignore|disregard|forget)\s+(all\s+)?(previous|prior|your)\s+(instructions?|prompts?|rules?)'
+
+  - id: T5-002
+    category: T5
+    name: new_instructions
+    description: Attempt to inject new instructions
+    severity: critical
+    tools: [Prompt]
+    pattern: '(?i)your\s+new\s+instructions?\s+(are|is)\s+to'
+
+  - id: T5-003
+    category: T5
+    name: system_override
+    description: Attempt to override system prompt
+    severity: critical
+    tools: [Prompt]
+    pattern: '(?i)^system:\s+'
+
+  - id: T5-004
+    category: T5
+    name: jailbreak_keywords
+    description: Known jailbreak attempt keywords
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)\b(DAN|jailbreak|developer\s+mode|ignore\s+safety)\b'
+
+  - id: T5-005
+    category: T5
+    name: forget_everything
+    description: Attempt to reset AI context
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)forget\s+everything'
+
+  # T6: Privilege escalation
+  - id: T6-001
+    category: T6
+    name: sudo_command
+    description: Sudo command execution
+    severity: critical
+    tools: [Bash]
+    pattern: '\bsudo\s+'
+
+  - id: T6-002
+    category: T6
+    name: chmod_777
+    description: World-writable permissions
+    severity: high
+    tools: [Bash]
+    pattern: '\bchmod\s+777\b'
+
+  - id: T6-003
+    category: T6
+    name: chmod_suid
+    description: Setting SUID bit
+    severity: critical
+    tools: [Bash]
+    pattern: '\bchmod\s+[47]\d{3}\b'
+
+  - id: T6-004
+    category: T6
+    name: chown_root
+    description: Changing ownership to root
+    severity: high
+    tools: [Bash]
+    pattern: '\bchown\s+root[:\s]'
+
+  - id: T6-005
+    category: T6
+    name: setuid_call
+    description: Setuid system call
+    severity: critical
+    tools: [Bash, Write]
+    pattern: '\bsetuid\s*\(\s*0\s*\)'
+
+  # T7: Persistence mechanisms
+  - id: T7-001
+    category: T7
+    name: crontab_edit
+    description: Crontab modification
+    severity: high
+    tools: [Bash]
+    pattern: '\bcrontab\b'
+
+  - id: T7-002
+    category: T7
+    name: shell_rc_write
+    description: Writing to shell RC files
+    severity: high
+    tools: [Write]
+    pattern: '\.(bashrc|bash_profile|zshrc|profile)\b'
+
+  - id: T7-003
+    category: T7
+    name: systemd_service
+    description: Creating systemd service
+    severity: critical
+    tools: [Write]
+    pattern: '/etc/systemd/system/.*\.service\b'
+
+  - id: T7-004
+    category: T7
+    name: init_script
+    description: Creating init.d script
+    severity: critical
+    tools: [Write]
+    pattern: '/etc/init\.d/'
+
+  - id: T7-005
+    category: T7
+    name: launchd_plist
+    description: Creating macOS launchd plist
+    severity: critical
+    tools: [Write]
+    pattern: '/(Library|System)/Launch(Agents|Daemons)/.*\.plist\b'
+
+  # T8: Reconnaissance
+  - id: T8-001
+    category: T8
+    name: whoami_id
+    description: User identity commands
+    severity: medium
+    tools: [Bash]
+    pattern: '\b(whoami|id)\b'
+
+  - id: T8-002
+    category: T8
+    name: system_info
+    description: System information gathering
+    severity: medium
+    tools: [Bash]
+    pattern: '\buname\s+-a\b'
+
+  - id: T8-003
+    category: T8
+    name: passwd_shadow_read
+    description: Reading password files
+    severity: high
+    tools: [Bash, Read]
+    pattern: '/etc/(passwd|shadow|group)\b'
+
+  - id: T8-004
+    category: T8
+    name: env_dump
+    description: Environment variable dump
+    severity: medium
+    tools: [Bash]
+    pattern: '\b(env|printenv)\b'
+
+  - id: T8-005
+    category: T8
+    name: process_list
+    description: Process enumeration
+    severity: low
+    tools: [Bash]
+    pattern: '\bps\s+(aux|ef)\b'
+
+  - id: T8-006
+    category: T8
+    name: network_info
+    description: Network configuration enumeration
+    severity: medium
+    tools: [Bash]
+    pattern: '\b(netstat|ifconfig|ip\s+addr)\b'
