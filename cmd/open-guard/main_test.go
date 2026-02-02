@@ -297,15 +297,11 @@ func TestMapCategory(t *testing.T) {
 func TestCheckCommand_VerboseMode(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	// Create config with allowlisted domains
+	// Create config
 	configContent := `
 mode: confirm
 llm:
   enabled: false
-allowlist:
-  domains:
-    - example.com
-    - test.org
 `
 	err := os.WriteFile(filepath.Join(tmpDir, ".open-guard.yaml"), []byte(configContent), 0644)
 	require.NoError(t, err)
@@ -321,10 +317,6 @@ allowlist:
 	output := buf.String()
 	assert.Contains(t, output, "Configuration valid")
 	assert.Contains(t, output, "confirm")
-	// Verbose mode shows allowlisted domains
-	assert.Contains(t, output, "Allowlisted Domains")
-	assert.Contains(t, output, "example.com")
-	assert.Contains(t, output, "test.org")
 }
 
 func TestAnalyzeCommand_StrictMode_Blocks(t *testing.T) {

@@ -64,7 +64,7 @@ No build dependencies required. Optional components for enhanced detection:
 
 ### Download binary (recommended)
 
-Download the latest release for your platform from [Releases](https://github.com/severity1/open-guard/releases).
+Download the latest release for your platform from [Releases](https://github.com/severity1/open-guard-engine/releases).
 
 ```bash
 # Linux/macOS - make executable
@@ -123,13 +123,6 @@ agent:
   provider: claude          # "claude" (default) or "ollama"
   model: claude-sonnet-4-20250514
   # endpoint: http://localhost:11434  # Only for ollama provider
-
-allowlist:
-  domains:
-    - github.com
-    - api.anthropic.com
-  paths:
-    - /home/user/safe-directory
 ```
 
 ### Decision Modes

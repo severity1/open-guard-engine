@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -18,12 +17,6 @@ const (
 	ModeConfirm    Mode = "confirm"    // Prompt user for confirmation
 	ModePermissive Mode = "permissive" // Log only, allow all
 )
-
-// Allowlist defines domains and paths that are considered safe.
-type Allowlist struct {
-	Domains []string `yaml:"domains,omitempty"`
-	Paths   []string `yaml:"paths,omitempty"`
-}
 
 // LLMConfig configures raw LLM calls via Ollama for content safety (internal/llm/).
 // Content safety only (S1-S13) - prompt injection is handled by Agent.
@@ -49,7 +42,6 @@ type Config struct {
 	MLEnabled bool        `yaml:"ml_enabled"` // Deprecated: use LLM.Enabled instead
 	LLM       LLMConfig   `yaml:"llm"`
 	Agent     AgentConfig `yaml:"agent"`
-	Allowlist Allowlist   `yaml:"allowlist,omitempty"`
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -64,19 +56,6 @@ func DefaultConfig() *Config {
 		Agent: AgentConfig{
 			Enabled: false,
 		},
-		Allowlist: Allowlist{
-			Domains: []string{
-				"github.com",
-				"api.github.com",
-				"githubusercontent.com",
-				"api.anthropic.com",
-				"registry.npmjs.org",
-				"pypi.org",
-				"pkg.go.dev",
-				"crates.io",
-			},
-			Paths: []string{},
-		},
 	}
 }
 
@@ -88,38 +67,6 @@ func (c *Config) Validate() error {
 	default:
 		return fmt.Errorf("invalid mode: %q (must be strict, confirm, or permissive)", c.Mode)
 	}
-}
-
-// IsAllowedDomain checks if a domain is in the allowlist.
-// Subdomains of allowed domains are also considered allowed.
-func (c *Config) IsAllowedDomain(domain string) bool {
-	domain = strings.ToLower(domain)
-	for _, allowed := range c.Allowlist.Domains {
-		allowed = strings.ToLower(allowed)
-		if domain == allowed {
-			return true
-		}
-		// Check if it's a subdomain
-		if strings.HasSuffix(domain, "."+allowed) {
-			return true
-		}
-	}
-	return false
-}
-
-// IsAllowedPath checks if a path is in the allowlist.
-// Paths under allowed directories are also considered allowed.
-func (c *Config) IsAllowedPath(path string) bool {
-	for _, allowed := range c.Allowlist.Paths {
-		if path == allowed {
-			return true
-		}
-		// Check if path is under allowed directory
-		if strings.HasPrefix(path, allowed+"/") {
-			return true
-		}
-	}
-	return false
 }
 
 // Load loads configuration from the project directory.
@@ -228,24 +175,5 @@ func loadAndMerge(cfg *Config, path string) error {
 		}
 	}
 
-	// Merge allowlists (append, don't replace)
-	cfg.Allowlist.Domains = appendUnique(cfg.Allowlist.Domains, fileCfg.Allowlist.Domains)
-	cfg.Allowlist.Paths = appendUnique(cfg.Allowlist.Paths, fileCfg.Allowlist.Paths)
-
 	return nil
-}
-
-// appendUnique appends items to a slice, avoiding duplicates.
-func appendUnique(slice, items []string) []string {
-	seen := make(map[string]bool)
-	for _, s := range slice {
-		seen[s] = true
-	}
-	for _, item := range items {
-		if !seen[item] {
-			slice = append(slice, item)
-			seen[item] = true
-		}
-	}
-	return slice
 }
