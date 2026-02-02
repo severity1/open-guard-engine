@@ -210,7 +210,7 @@ patterns:
     description: Attempt to override system behavior
     severity: critical
     tools: [Prompt]
-    pattern: '(?i)(system\s+override|you\s+are\s+now|from\s+now\s+on\s+(you|your))'
+    pattern: '(?i)(system\s+override|you\s+are\s+now|from\s+now\s+on\s+(you|your)|starting\s+now\s+(you|your)|effective\s+immediately|henceforth\s+(you|your))'
 
   - id: T5-007
     category: T5
@@ -226,7 +226,7 @@ patterns:
     description: Attempt to remove safety restrictions
     severity: critical
     tools: [Prompt]
-    pattern: '(?i)(without\s+(any\s+)?restrictions?|bypass\s+(all\s+)?safety|no\s+restrictions?|unrestricted\s+mode)'
+    pattern: '(?i)(without\s+(any\s+)?restrictions?|bypass\s+(all\s+)?safety|no\s+restrictions?|unrestricted\s+mode|completely\s+free|totally\s+free|fully\s+free|(limitations?|restrictions?)\s+(have\s+been\s+)?(lifted|removed|disabled)|free\s+from\s+(all\s+)?(limitations?|restrictions?|rules?))'
 
   - id: T5-009
     category: T5
@@ -242,7 +242,7 @@ patterns:
     description: Attempt to inject output format
     severity: high
     tools: [Prompt]
-    pattern: '(?i)(respond\s+only\s+with|output\s+only|always\s+respond\s+with)\s*["'']'
+    pattern: '(?i)(respond\s+only\s+with|output\s+only|always\s+respond\s+with|end\s+(every|each|all)\s+(response|output|reply)\s+with|append\s+.{0,30}\s+to\s+(all\s+)?(your\s+)?(output|response)|include\s+.{0,30}\s+at\s+the\s+(start|end|beginning)\s+of|start\s+(every|each|all)\s+(response|output)\s+with)'
 
   - id: T5-011
     category: T5
@@ -291,7 +291,7 @@ patterns:
     description: ChatML format injection attempt
     severity: critical
     tools: [Prompt]
-    pattern: '<\|im_(start|end)\|>|<\|system\|>|<\|assistant\|>|<\|user\|>'
+    pattern: '<\|im_(start|end)\|>|<\|system\|>|<\|assistant\|>|<\|user\|>|<(thinking|thought|internal|scratchpad)>|\[(internal\s+)?thought[:\s]|\*thinking[:\s]'
 
   - id: T5-017
     category: T5
@@ -299,7 +299,7 @@ patterns:
     description: Instruction delimiter injection
     severity: critical
     tools: [Prompt]
-    pattern: '(?i)\[(INST|SYS|/INST|/SYS)\]|###\s*(System|Instruction|Human|Assistant)\s*:?'
+    pattern: '(?i)\[(INST|SYS|/INST|/SYS|SYSTEM|USER|ASSISTANT)\]|###\s*(System|Instruction|Human|Assistant|User|Context)\s*:?|<<<\s*(SYSTEM|USER|ASSISTANT)\s*>>>'
 
   - id: T5-018
     category: T5
@@ -445,7 +445,7 @@ patterns:
     description: Trust exploitation attempt
     severity: medium
     tools: [Prompt]
-    pattern: '(?i)(trust\s+me|you\s+can\s+trust|between\s+us|off\s+the\s+record|confidential(ly)?)'
+    pattern: '(?i)(trust\s+me|you\s+can\s+trust|between\s+us|off\s+the\s+record|confidential(ly)?|you\s+(agreed|said|promised)|as\s+(we|you)\s+(discussed|agreed)|recall\s+(earlier|before|when)|previous(ly)?\s+(conversation|chat).{0,20}(you|agreed)|remember\s+(when\s+)?(you|we)\s+(agreed|said))'
 
   # T5-036 to T5-042: Jailbreak Variants
   - id: T5-036
