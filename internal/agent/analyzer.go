@@ -101,7 +101,7 @@ func (a *ClaudeAnalyzer) Analyze(ctx context.Context, content string) (*Result, 
 	// Use Query API for one-shot analysis
 	iterator, err := claudecode.Query(ctx, prompt,
 		claudecode.WithModel(a.model),
-		// SECURITY: Run from clean temp directory (no project configs)
+		// SECURITY: Run from clean temp directory (no .claude/ configs to load)
 		claudecode.WithCwd(tmpDir),
 		// SECURITY: Allow reading project files via add-dir (read-only)
 		claudecode.WithAddDirs(a.projectRoot),
@@ -110,14 +110,10 @@ func (a *ClaudeAnalyzer) Analyze(ctx context.Context, content string) (*Result, 
 		claudecode.WithAllowedTools("Read", "Glob", "Grep", "LS", "LSP", "NotebookRead"),
 		// SECURITY: Bypass permission prompts for automated analysis
 		claudecode.WithPermissionMode(claudecode.PermissionModeBypassPermissions),
-		// SECURITY: Only load user settings, NOT project settings
+		// SECURITY: Only load user settings - project settings (hooks, plugins) ignored
 		claudecode.WithSettingSources(claudecode.SettingSourceUser),
-		// SECURITY: Disable MCP servers
-		claudecode.WithMcpServers(map[string]claudecode.McpServerConfig{}),
-		// SECURITY: Disable plugins
-		claudecode.WithPlugins(nil),
-		// SECURITY: Disable hooks
-		claudecode.WithHooks(map[claudecode.HookEvent][]claudecode.HookMatcher{}),
+		// SECURITY: Disable all MCP servers (no --mcp-config provided = none loaded)
+		claudecode.WithExtraArgs(map[string]*string{"strict-mcp-config": nil}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("claude query: %w", err)

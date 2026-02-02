@@ -161,10 +161,10 @@ Recommended Ollama models: `llama3:latest`, `llama3:70b` (larger models have bet
 
 The agent analyzer runs in a hardened sandbox to prevent malicious projects from compromising the security scan:
 
-- **Isolated execution** - Runs from a clean temp directory, ignoring project `.claude/` configs
+- **Isolated execution** - Runs from a clean temp directory (no `.claude/` configs to load)
 - **Read-only tools** - Limited to `Read`, `Glob`, `Grep`, `LS`, `LSP`, `NotebookRead`
-- **No extensions** - MCP servers, plugins, and hooks are disabled
-- **User settings only** - Project-level settings cannot override security controls
+- **User settings only** - Project settings ignored via `--setting-sources user` (hooks, plugins from project configs won't load)
+- **No MCP servers** - All MCP disabled via `--strict-mcp-config` with no config provided
 
 This prevents attack vectors where a malicious repository includes configurations designed to bypass detection.
 
