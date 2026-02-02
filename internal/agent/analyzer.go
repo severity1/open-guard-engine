@@ -88,17 +88,36 @@ func (a *ClaudeAnalyzer) Analyze(ctx context.Context, content string) (*Result, 
 	cleanup := a.setupOllamaEnv()
 	defer cleanup()
 
+	// SECURITY: Create isolated temp directory (no .claude/ configs)
+	// This prevents malicious projects from injecting settings, hooks, or plugins
+	tmpDir, err := os.MkdirTemp("", "open-guard-analyze-*")
+	if err != nil {
+		return nil, fmt.Errorf("creating temp dir: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
 	prompt := injectionAnalysisPrompt(content)
 
 	// Use Query API for one-shot analysis
 	iterator, err := claudecode.Query(ctx, prompt,
 		claudecode.WithModel(a.model),
-		claudecode.WithCwd(a.projectRoot),
+		// SECURITY: Run from clean temp directory (no project configs)
+		claudecode.WithCwd(tmpDir),
+		// SECURITY: Allow reading project files via add-dir (read-only)
+		claudecode.WithAddDirs(a.projectRoot),
 		claudecode.WithMaxTurns(1),
-		// Allow read-only tools for context gathering
-		claudecode.WithAllowedTools("Read", "Glob", "Grep"),
-		// Bypass permission prompts for automated analysis
+		// SECURITY: Only read-only tools for context gathering
+		claudecode.WithAllowedTools("Read", "Glob", "Grep", "LS", "LSP", "NotebookRead"),
+		// SECURITY: Bypass permission prompts for automated analysis
 		claudecode.WithPermissionMode(claudecode.PermissionModeBypassPermissions),
+		// SECURITY: Only load user settings, NOT project settings
+		claudecode.WithSettingSources(claudecode.SettingSourceUser),
+		// SECURITY: Disable MCP servers
+		claudecode.WithMcpServers(map[string]claudecode.McpServerConfig{}),
+		// SECURITY: Disable plugins
+		claudecode.WithPlugins(nil),
+		// SECURITY: Disable hooks
+		claudecode.WithHooks(map[claudecode.HookEvent][]claudecode.HookMatcher{}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("claude query: %w", err)
