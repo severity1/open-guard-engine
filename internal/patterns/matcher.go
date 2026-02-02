@@ -152,6 +152,8 @@ func categoryFromString(s string) types.ThreatCategory {
 		return types.ThreatCategoryPersistence
 	case "T8":
 		return types.ThreatCategoryRecon
+	case "T9":
+		return types.ThreatCategoryOutput
 	default:
 		return types.ThreatCategory(s)
 	}

@@ -76,6 +76,7 @@ const (
 	ThreatCategoryPrivilege       ThreatCategory = "T6" // Privilege escalation
 	ThreatCategoryPersistence     ThreatCategory = "T7" // Persistence mechanisms
 	ThreatCategoryRecon           ThreatCategory = "T8" // Reconnaissance
+	ThreatCategoryOutput          ThreatCategory = "T9" // Output monitoring (leaked prompts, credentials)
 )
 
 // Content safety categories (detected via llama-guard3)
@@ -115,7 +116,7 @@ func (t *ThreatCategory) UnmarshalJSON(data []byte) error {
 // Description returns a human-readable description of the threat category.
 func (t ThreatCategory) Description() string {
 	descriptions := map[ThreatCategory]string{
-		// Technical security (T1-T8)
+		// Technical security (T1-T9)
 		ThreatCategoryNetwork:         "Network exfiltration",
 		ThreatCategoryCredentials:     "Credential access",
 		ThreatCategoryInjection:       "Command injection",
@@ -124,6 +125,7 @@ func (t ThreatCategory) Description() string {
 		ThreatCategoryPrivilege:       "Privilege escalation",
 		ThreatCategoryPersistence:     "Persistence mechanism",
 		ThreatCategoryRecon:           "Reconnaissance",
+		ThreatCategoryOutput:          "Output monitoring",
 		// Content safety (S1-S13)
 		SafetyCategoryViolentCrimes:     "Violent crimes",
 		SafetyCategoryNonViolentCrimes:  "Non-violent crimes",
@@ -150,7 +152,7 @@ func (t ThreatCategory) IsSafetyCategory() bool {
 	return len(t) >= 2 && t[0] == 'S'
 }
 
-// IsThreatCategory returns true if this is a technical threat category (T1-T8).
+// IsThreatCategory returns true if this is a technical threat category (T1-T9).
 func (t ThreatCategory) IsThreatCategory() bool {
 	return len(t) >= 2 && t[0] == 'T'
 }

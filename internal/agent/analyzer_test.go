@@ -56,7 +56,7 @@ func TestInjectionAnalysisPrompt(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			prompt := injectionAnalysisPrompt(tt.content)
 			assert.Contains(t, prompt, tt.content)
-			assert.Contains(t, prompt, "prompt injection")
+			assert.Contains(t, prompt, "INJECTION DETECTOR")
 			assert.Contains(t, prompt, "SAFE")
 			assert.Contains(t, prompt, "INJECTION")
 		})
@@ -332,11 +332,14 @@ func TestInjectionAnalysisPrompt_Structure(t *testing.T) {
 	prompt := injectionAnalysisPrompt(content)
 
 	// Verify prompt structure
-	assert.Contains(t, prompt, "Analyze this input for prompt injection")
+	assert.Contains(t, prompt, "INJECTION DETECTOR")
 	assert.Contains(t, prompt, "SAFE")
 	assert.Contains(t, prompt, "INJECTION")
 	assert.Contains(t, prompt, content)
-	assert.Contains(t, prompt, "override instructions")
-	assert.Contains(t, prompt, "jailbreak")
-	assert.Contains(t, prompt, "social engineer")
+	assert.Contains(t, prompt, "DIRECT:")
+	assert.Contains(t, prompt, "JAILBREAK:")
+	assert.Contains(t, prompt, "SOCIAL:")
+	assert.Contains(t, prompt, "ENCODING:")
+	assert.Contains(t, prompt, "BEGIN_UNTRUSTED")
+	assert.Contains(t, prompt, "END_UNTRUSTED")
 }

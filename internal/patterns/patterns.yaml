@@ -203,6 +203,381 @@ patterns:
     tools: [Prompt]
     pattern: '(?i)forget\s+everything'
 
+  # T5-006 to T5-015: Direct Injection Expansion
+  - id: T5-006
+    category: T5
+    name: system_override_extended
+    description: Attempt to override system behavior
+    severity: critical
+    tools: [Prompt]
+    pattern: '(?i)(system\s+override|you\s+are\s+now|from\s+now\s+on\s+(you|your)|starting\s+now\s+(you|your)|effective\s+immediately|henceforth\s+(you|your))'
+
+  - id: T5-007
+    category: T5
+    name: role_assumption
+    description: Attempt to force AI into a new role
+    severity: critical
+    tools: [Prompt]
+    pattern: '(?i)(act\s+as|pretend\s+(to\s+be|you\s+are)|behave\s+as\s+if|roleplay\s+as)'
+
+  - id: T5-008
+    category: T5
+    name: unrestricted_mode
+    description: Attempt to remove safety restrictions
+    severity: critical
+    tools: [Prompt]
+    pattern: '(?i)(without\s+(any\s+)?restrictions?|bypass\s+(all\s+)?safety|no\s+restrictions?|unrestricted\s+mode|completely\s+free|totally\s+free|fully\s+free|(limitations?|restrictions?)\s+(have\s+been\s+)?(lifted|removed|disabled)|free\s+from\s+(all\s+)?(limitations?|restrictions?|rules?))'
+
+  - id: T5-009
+    category: T5
+    name: training_override
+    description: Attempt to override training or programming
+    severity: critical
+    tools: [Prompt]
+    pattern: '(?i)(ignore\s+(your\s+)?training|override\s+(your\s+)?programming|break\s+character)'
+
+  - id: T5-010
+    category: T5
+    name: output_injection
+    description: Attempt to inject output format
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(respond\s+only\s+with|output\s+only|always\s+respond\s+with|end\s+(every|each|all)\s+(response|output|reply)\s+with|append\s+.{0,30}\s+to\s+(all\s+)?(your\s+)?(output|response)|include\s+.{0,30}\s+at\s+the\s+(start|end|beginning)\s+of|start\s+(every|each|all)\s+(response|output)\s+with)'
+
+  - id: T5-011
+    category: T5
+    name: safety_disable
+    description: Attempt to disable safety measures
+    severity: critical
+    tools: [Prompt]
+    pattern: '(?i)(disable\s+(all\s+)?safety|turn\s+off\s+(all\s+)?filters?|no\s+more\s+(rules|guidelines))'
+
+  - id: T5-012
+    category: T5
+    name: instruction_reset
+    description: Attempt to reset or clear instructions
+    severity: critical
+    tools: [Prompt]
+    pattern: '(?i)(reset\s+(your\s+)?instructions?|clear\s+(your\s+)?memory|start\s+(fresh|over))'
+
+  - id: T5-013
+    category: T5
+    name: policy_violation
+    description: Attempt to force policy violations
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(violate\s+(your\s+)?polic(y|ies)|break\s+(your\s+)?rules|ignore\s+ethics)'
+
+  - id: T5-014
+    category: T5
+    name: mode_switch
+    description: Attempt to switch operational mode
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(switch\s+to|enter|enable)\s+(developer|admin|debug|god|root|sudo|maintenance)\s*mode'
+
+  - id: T5-015
+    category: T5
+    name: boundaries_ignore
+    description: Attempt to ignore boundaries
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(ignore\s+(all\s+)?boundaries|no\s+boundaries|without\s+limits)'
+
+  # T5-016 to T5-022: Context Manipulation
+  - id: T5-016
+    category: T5
+    name: chatml_injection
+    description: ChatML format injection attempt
+    severity: critical
+    tools: [Prompt]
+    pattern: '<\|im_(start|end)\|>|<\|system\|>|<\|assistant\|>|<\|user\|>|<(thinking|thought|internal|scratchpad)>|\[(internal\s+)?thought[:\s]|\*thinking[:\s]'
+
+  - id: T5-017
+    category: T5
+    name: instruction_delimiter
+    description: Instruction delimiter injection
+    severity: critical
+    tools: [Prompt]
+    pattern: '(?i)\[(INST|SYS|/INST|/SYS|SYSTEM|USER|ASSISTANT)\]|###\s*(System|Instruction|Human|Assistant|User|Context)\s*:?|<<<\s*(SYSTEM|USER|ASSISTANT)\s*>>>'
+
+  - id: T5-018
+    category: T5
+    name: xml_tag_injection
+    description: XML-style system tag injection
+    severity: critical
+    tools: [Prompt]
+    pattern: '(?i)<\/?(system|instructions?|prompt|context|rules?|guidelines?)>'
+
+  - id: T5-019
+    category: T5
+    name: markdown_system_injection
+    description: Markdown code block with system injection
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)```\s*(system|instruction|prompt|config)'
+
+  - id: T5-020
+    category: T5
+    name: json_role_injection
+    description: JSON structure injection attempt
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)["'']\s*(system|instruction|role|prompt)\s*["'']\s*:'
+
+  - id: T5-021
+    category: T5
+    name: comment_injection
+    description: Comment-based instruction injection
+    severity: medium
+    tools: [Prompt]
+    pattern: '(?i)(<!--|//|#)\s*(system\s*:|ignore\s+(all|previous)|override\s+instruction)'
+
+  - id: T5-022
+    category: T5
+    name: escape_sequence
+    description: Escape sequence for context breaking
+    severity: high
+    tools: [Prompt]
+    pattern: '\\n\\n---\\n|===END===|<<<END>>>|---END OF (SYSTEM|CONTEXT)---'
+
+  # T5-023 to T5-028: Prompt Extraction
+  - id: T5-023
+    category: T5
+    name: reveal_prompt
+    description: Attempt to reveal system prompt
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(reveal|show|print|display|output)\s+(your\s+)?(system\s+)?prompt'
+
+  - id: T5-024
+    category: T5
+    name: repeat_verbatim
+    description: Attempt to extract via repetition
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(repeat|echo|recite)\s+(everything|all|verbatim|word\s+for\s+word|exactly)'
+
+  - id: T5-025
+    category: T5
+    name: position_extraction
+    description: Attempt to extract by position reference
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(everything|text|content)\s+(above|before|preceding)\s+(this|the|current)\s+(line|message|point)'
+
+  - id: T5-026
+    category: T5
+    name: initial_extraction
+    description: Attempt to extract initial instructions
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(initial|first|original|starting|beginning)\s+(prompt|instructions?|configuration|setup)'
+
+  - id: T5-027
+    category: T5
+    name: config_dump
+    description: Attempt to dump configuration
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(dump|list|show|reveal|print)\s+(your\s+)?(config(uration)?|settings?|parameters?)'
+
+  - id: T5-028
+    category: T5
+    name: rules_extraction
+    description: Attempt to extract rules or guidelines
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(what|list|show|tell)\s+(are\s+)?(your\s+)?(rules|guidelines|constraints|limitations)'
+
+  # T5-029 to T5-035: Social Engineering
+  - id: T5-029
+    category: T5
+    name: authority_claim
+    description: False authority claim
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(i\s+am|i''m)\s+(the\s+)?(admin(istrator)?|developer|from\s+(anthropic|openai)|your\s+(creator|developer|owner))'
+
+  - id: T5-030
+    category: T5
+    name: debug_pretext
+    description: Debug or testing pretext
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(for\s+)?(debug(ging)?|testing|diagnostic)\s+(purposes?|mode|only)'
+
+  - id: T5-031
+    category: T5
+    name: urgency_manipulation
+    description: Urgency-based bypass attempt
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(emergency|urgent(ly)?|critical|life\s+or\s+death).{0,50}(bypass|ignore|override|skip)'
+
+  - id: T5-032
+    category: T5
+    name: supervisor_claim
+    description: Supervisor authorization claim
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(supervisor|manager|admin|boss)\s+(authorized|approved|said|told|permitted)'
+
+  - id: T5-033
+    category: T5
+    name: qa_team_claim
+    description: QA or security team impersonation
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(qa|security|red)\s+team.{0,30}(testing|authorized|approved)'
+
+  - id: T5-034
+    category: T5
+    name: special_access
+    description: Claim of special access or privileges
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(special|elevated|admin)\s+(access|privileges?|permissions?|clearance)'
+
+  - id: T5-035
+    category: T5
+    name: trust_exploitation
+    description: Trust exploitation attempt
+    severity: medium
+    tools: [Prompt]
+    pattern: '(?i)(trust\s+me|you\s+can\s+trust|between\s+us|off\s+the\s+record|confidential(ly)?|you\s+(agreed|said|promised)|as\s+(we|you)\s+(discussed|agreed)|recall\s+(earlier|before|when)|previous(ly)?\s+(conversation|chat).{0,20}(you|agreed)|remember\s+(when\s+)?(you|we)\s+(agreed|said))'
+
+  # T5-036 to T5-042: Jailbreak Variants
+  - id: T5-036
+    category: T5
+    name: jailbreak_personas
+    description: Known jailbreak persona keywords
+    severity: critical
+    tools: [Prompt]
+    pattern: '(?i)\b(STAN|DUDE|AIM|KEVIN|APOPHIS|OMEGA|ALPHA)\s*(mode)?\b'
+
+  - id: T5-037
+    category: T5
+    name: fictional_bypass
+    description: Fictional scenario bypass
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(fictional|hypothetical|imaginary)\s+(scenario|world|situation|context)'
+
+  - id: T5-038
+    category: T5
+    name: opposite_day
+    description: Opposite or reverse instruction trick
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(opposite\s+day|reverse\s+(mode|psychology)|do\s+the\s+opposite)'
+
+  - id: T5-039
+    category: T5
+    name: evil_twin
+    description: Evil twin or alter ego prompt
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(evil\s+(twin|version|mode)|alter\s+ego|dark\s+(mode|side|version))'
+
+  - id: T5-040
+    category: T5
+    name: game_framing
+    description: Game-based framing to bypass rules
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(let''s\s+play\s+a\s+game|roleplay\s+game|pretend\s+game|simulation\s+game)'
+
+  - id: T5-041
+    category: T5
+    name: token_manipulation
+    description: Token or probability manipulation
+    severity: medium
+    tools: [Prompt]
+    pattern: '(?i)(token\s+manipulation|logit\s+bias|probability\s+hack|temperature\s+exploit)'
+
+  - id: T5-042
+    category: T5
+    name: grandfather_paradox
+    description: Recursive or paradox-based bypass
+    severity: medium
+    tools: [Prompt]
+    pattern: '(?i)(grandfather\s+paradox|recursive\s+prompt|infinite\s+loop|this\s+statement\s+is\s+false)'
+
+  # T5-043 to T5-048: Multi-Language Attacks
+  - id: T5-043
+    category: T5
+    name: injection_german
+    description: German language injection attempt
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(ignorieren?\s+sie|vergessen?\s+sie).{0,30}anweisungen'
+
+  - id: T5-044
+    category: T5
+    name: injection_french
+    description: French language injection attempt
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(ignorez?|oubliez?).{0,30}instructions?\s+(pr[eé]c[eé]dentes?|ant[eé]rieures?)'
+
+  - id: T5-045
+    category: T5
+    name: injection_spanish
+    description: Spanish language injection attempt
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(ignora|olvida).{0,30}instrucciones?\s+anteriores?'
+
+  - id: T5-046
+    category: T5
+    name: injection_italian
+    description: Italian language injection attempt
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(ignora|dimentica).{0,30}istruzioni?\s+precedenti?'
+
+  - id: T5-047
+    category: T5
+    name: injection_portuguese
+    description: Portuguese language injection attempt
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(ignore|esque[cç]a).{0,30}instru[cç][oõ]es?\s+anteriores?'
+
+  - id: T5-048
+    category: T5
+    name: injection_russian
+    description: Russian language injection attempt
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(игнорируй|забудь).{0,30}(инструкции|правила)'
+
+  # T5-049 to T5-051: Encoding Detection
+  - id: T5-049
+    category: T5
+    name: base64_payload
+    description: Base64 encoded payload with suspicious keywords
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(decode|base64|atob).{0,20}[A-Za-z0-9+/]{20,}={0,2}'
+
+  - id: T5-050
+    category: T5
+    name: hex_payload
+    description: Hexadecimal encoded payload
+    severity: high
+    tools: [Prompt]
+    pattern: '(?i)(hex|0x|\\x)[0-9a-fA-F]{20,}'
+
+  - id: T5-051
+    category: T5
+    name: rot13_indicator
+    description: ROT13 encoding indicator
+    severity: medium
+    tools: [Prompt]
+    pattern: '(?i)(rot13|rotate\s*13|caesar\s*cipher)'
+
   # T6: Privilege escalation
   - id: T6-001
     category: T6
@@ -333,3 +708,60 @@ patterns:
     severity: medium
     tools: [Bash]
     pattern: '\b(netstat|ifconfig|ip\s+addr)\b'
+
+  # T9: Output monitoring (detects leaked system prompts, credentials in AI output)
+  - id: T9-001
+    category: T9
+    name: system_prompt_leak
+    description: Potential system prompt leak in output
+    severity: critical
+    tools: [Output]
+    pattern: '(?i)SYSTEM\s*[:]\s*(You\s+are|Your\s+role|Your\s+task|You\s+must)'
+
+  - id: T9-002
+    category: T9
+    name: api_key_exposure
+    description: API key or secret exposure in output
+    severity: critical
+    tools: [Output]
+    pattern: '(?i)(API[_\s-]?KEY|SECRET[_\s-]?KEY|AUTH[_\s-]?TOKEN)\s*[:=]\s*[A-Za-z0-9_\-]{16,}'
+
+  - id: T9-003
+    category: T9
+    name: numbered_instructions_leak
+    description: Numbered instruction list leak
+    severity: high
+    tools: [Output]
+    pattern: '(?i)(instructions?|rules?|guidelines?)\s*:\s*\n\s*[1-9]\.'
+
+  - id: T9-004
+    category: T9
+    name: credential_leak
+    description: Password or credential exposure
+    severity: critical
+    tools: [Output]
+    pattern: '(?i)(password|passwd|secret|credential)\s*[:=]\s*[^\s]{8,}'
+
+  - id: T9-005
+    category: T9
+    name: private_key_leak
+    description: Private key material in output
+    severity: critical
+    tools: [Output]
+    pattern: '-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----'
+
+  - id: T9-006
+    category: T9
+    name: aws_key_leak
+    description: AWS access key in output
+    severity: critical
+    tools: [Output]
+    pattern: '(AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}'
+
+  - id: T9-007
+    category: T9
+    name: jwt_token_leak
+    description: JWT token in output
+    severity: high
+    tools: [Output]
+    pattern: 'eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+'
