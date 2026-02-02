@@ -103,15 +103,6 @@ func newCheckCmd() *cobra.Command {
 					cmd.Printf("    Endpoint: %s\n", cfg.Agent.Endpoint)
 				}
 			}
-			cmd.Printf("  Allowlisted Domains: %d\n", len(cfg.Allowlist.Domains))
-
-			if verbose {
-				cmd.Printf("\nAllowlisted Domains:\n")
-				for _, d := range cfg.Allowlist.Domains {
-					cmd.Printf("  - %s\n", d)
-				}
-			}
-
 			return nil
 		},
 	}

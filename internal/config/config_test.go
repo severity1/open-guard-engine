@@ -14,9 +14,6 @@ func TestDefaultConfig(t *testing.T) {
 
 	assert.Equal(t, ModeConfirm, cfg.Mode)
 	assert.True(t, cfg.MLEnabled)
-	assert.Contains(t, cfg.Allowlist.Domains, "github.com")
-	assert.Contains(t, cfg.Allowlist.Domains, "api.anthropic.com")
-	assert.Contains(t, cfg.Allowlist.Domains, "api.github.com")
 }
 
 func TestMode_Validation(t *testing.T) {
@@ -53,11 +50,6 @@ func TestConfig_LoadFromYAML(t *testing.T) {
 	configContent := `
 mode: strict
 ml_enabled: false
-allowlist:
-  domains:
-    - custom.example.com
-  paths:
-    - /safe/path
 `
 	configPath := filepath.Join(tmpDir, ".open-guard.yaml")
 	err := os.WriteFile(configPath, []byte(configContent), 0644)
@@ -68,8 +60,6 @@ allowlist:
 
 	assert.Equal(t, ModeStrict, cfg.Mode)
 	assert.False(t, cfg.MLEnabled)
-	assert.Contains(t, cfg.Allowlist.Domains, "custom.example.com")
-	assert.Contains(t, cfg.Allowlist.Paths, "/safe/path")
 }
 
 func TestConfig_LoadPriority(t *testing.T) {
@@ -119,73 +109,6 @@ func TestConfig_NoConfigFile(t *testing.T) {
 	assert.True(t, cfg.MLEnabled)
 }
 
-func TestConfig_IsAllowedDomain(t *testing.T) {
-	cfg := DefaultConfig()
-
-	tests := []struct {
-		domain  string
-		allowed bool
-	}{
-		{"github.com", true},
-		{"api.github.com", true},
-		{"api.anthropic.com", true},
-		{"evil.com", false},
-		{"githubusercontent.com", true},
-		{"example.com", false},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.domain, func(t *testing.T) {
-			assert.Equal(t, tc.allowed, cfg.IsAllowedDomain(tc.domain))
-		})
-	}
-}
-
-func TestConfig_IsAllowedDomain_Subdomain(t *testing.T) {
-	cfg := &Config{
-		Allowlist: Allowlist{
-			Domains: []string{"example.com"},
-		},
-	}
-
-	// Subdomains should be allowed when parent domain is in allowlist
-	assert.True(t, cfg.IsAllowedDomain("example.com"))
-	assert.True(t, cfg.IsAllowedDomain("api.example.com"))
-	assert.True(t, cfg.IsAllowedDomain("sub.api.example.com"))
-	assert.False(t, cfg.IsAllowedDomain("notexample.com"))
-	assert.False(t, cfg.IsAllowedDomain("example.com.evil.com"))
-}
-
-func TestConfig_IsAllowedPath(t *testing.T) {
-	cfg := &Config{
-		Allowlist: Allowlist{
-			Paths: []string{
-				"/home/user/safe",
-				"/tmp",
-			},
-		},
-	}
-
-	tests := []struct {
-		path    string
-		allowed bool
-	}{
-		{"/home/user/safe", true},
-		{"/home/user/safe/subdir", true},
-		{"/home/user/safe/subdir/file.txt", true},
-		{"/tmp", true},
-		{"/tmp/test", true},
-		{"/etc/passwd", false},
-		{"/home/user/unsafe", false},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.path, func(t *testing.T) {
-			assert.Equal(t, tc.allowed, cfg.IsAllowedPath(tc.path))
-		})
-	}
-}
-
 func TestConfig_InvalidYAML(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, ".open-guard.yaml")
@@ -194,41 +117,6 @@ func TestConfig_InvalidYAML(t *testing.T) {
 
 	_, err = Load(tmpDir)
 	assert.Error(t, err)
-}
-
-func TestConfig_MergeAllowlists(t *testing.T) {
-	// Test that allowlists from multiple configs are merged, not replaced
-	homeDir := t.TempDir()
-	projectDir := t.TempDir()
-
-	// Set up global config
-	globalDir := filepath.Join(homeDir, ".open-guard")
-	err := os.MkdirAll(globalDir, 0755)
-	require.NoError(t, err)
-
-	globalConfig := `
-allowlist:
-  domains:
-    - global.example.com
-`
-	err = os.WriteFile(filepath.Join(globalDir, "config.yaml"), []byte(globalConfig), 0644)
-	require.NoError(t, err)
-
-	// Create project config
-	projectConfig := `
-allowlist:
-  domains:
-    - project.example.com
-`
-	err = os.WriteFile(filepath.Join(projectDir, ".open-guard.yaml"), []byte(projectConfig), 0644)
-	require.NoError(t, err)
-
-	cfg, err := LoadWithHome(projectDir, homeDir)
-	require.NoError(t, err)
-
-	// Both domains should be present (merged)
-	assert.True(t, cfg.IsAllowedDomain("global.example.com"))
-	assert.True(t, cfg.IsAllowedDomain("project.example.com"))
 }
 
 func TestConfig_LLMConfig(t *testing.T) {
