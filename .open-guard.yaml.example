@@ -1,0 +1,20 @@
+# open-guard configuration example
+# Copy to .open-guard.yaml and customize for your setup
+
+mode: confirm  # strict | confirm | permissive
+
+# LLM - Content Safety Detection (S1-S13)
+# Requires Ollama running locally with llama-guard3
+llm:
+  enabled: true
+  endpoint: http://localhost:11434
+  content_safety_model: llama-guard3:latest
+
+# Agent - Prompt Injection Detection (T5)
+# Uses Claude Code CLI as the agent harness
+# Requires: npm install -g @anthropic-ai/claude-code
+agent:
+  enabled: true
+  provider: claude          # "claude" (recommended) or "ollama"
+  model: claude-sonnet-4-20250514  # Sonnet recommended for semantic detection
+  # endpoint: http://localhost:11434  # Only needed for ollama provider

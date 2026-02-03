@@ -109,7 +109,7 @@ cat prompt.txt | open-guard analyze
 
 ## Configuration
 
-Create `.open-guard.yaml` in your project root or `~/.open-guard/config.yaml` globally:
+Copy `.open-guard.yaml.example` to `.open-guard.yaml` and customize, or create the file in `~/.open-guard/config.yaml` globally:
 
 ```yaml
 mode: confirm  # strict | confirm | permissive
