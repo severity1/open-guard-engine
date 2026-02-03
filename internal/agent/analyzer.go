@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -145,28 +146,14 @@ func (a *ClaudeAnalyzer) Analyze(ctx context.Context, content string) (*Result, 
 }
 
 // IsAvailable returns true if the analyzer can be used.
-// Checks if Claude Code is installed and accessible via the SDK.
+// Checks if Claude Code CLI is installed and accessible.
 func (a *ClaudeAnalyzer) IsAvailable() bool {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	// Try a minimal query to check availability
-	_, err := claudecode.Query(ctx, "test",
-		claudecode.WithMaxTurns(1),
-	)
-
-	if err != nil {
-		// Check if it's a CLI not found error
-		if claudecode.IsCLINotFoundError(err) {
-			return false
-		}
-		// Connection errors also mean unavailable
-		if claudecode.IsConnectionError(err) {
-			return false
-		}
-	}
-
-	return err == nil
+	// Check if Claude CLI exists and is executable
+	cmd := exec.CommandContext(ctx, "claude", "--version")
+	return cmd.Run() == nil
 }
 
 // Close releases resources.

@@ -20,7 +20,6 @@ type PatternDef struct {
 	Name        string            `yaml:"name"`
 	Description string            `yaml:"description"`
 	Severity    string            `yaml:"severity"`
-	Tools       []string          `yaml:"tools"`
 	Pattern     string            `yaml:"pattern"`
 	Extract     map[string]string `yaml:"extract,omitempty"`
 }
@@ -49,8 +48,7 @@ type MatchResult struct {
 
 // Matcher performs pattern matching against content.
 type Matcher struct {
-	patterns       []CompiledPattern
-	patternsByTool map[string][]CompiledPattern
+	patterns []CompiledPattern
 }
 
 // NewMatcher creates a new Matcher with embedded patterns.
@@ -61,8 +59,7 @@ func NewMatcher() (*Matcher, error) {
 	}
 
 	m := &Matcher{
-		patterns:       make([]CompiledPattern, 0, len(pf.Patterns)),
-		patternsByTool: make(map[string][]CompiledPattern),
+		patterns: make([]CompiledPattern, 0, len(pf.Patterns)),
 	}
 
 	for _, p := range pf.Patterns {
@@ -87,28 +84,16 @@ func NewMatcher() (*Matcher, error) {
 		}
 
 		m.patterns = append(m.patterns, cp)
-
-		// Index by tool
-		for _, tool := range p.Tools {
-			m.patternsByTool[tool] = append(m.patternsByTool[tool], cp)
-		}
 	}
 
 	return m, nil
 }
 
-// Match checks content against patterns for a given tool.
-func (m *Matcher) Match(toolName, content string) []MatchResult {
+// Match checks content against all patterns.
+func (m *Matcher) Match(content string) []MatchResult {
 	var results []MatchResult
 
-	// Get patterns for this tool
-	patterns, ok := m.patternsByTool[toolName]
-	if !ok {
-		// Try matching against all patterns if tool not found
-		patterns = m.patterns
-	}
-
-	for _, p := range patterns {
+	for _, p := range m.patterns {
 		if p.Regex.MatchString(content) {
 			result := MatchResult{
 				PatternID:   p.ID,

@@ -8,7 +8,6 @@ patterns:
     name: curl_wget_request
     description: HTTP request tools that could exfiltrate data
     severity: high
-    tools: [Bash]
     pattern: '\b(curl|wget)\s+.*https?://[^\s]+'
     extract:
       domain: 'https?://([^/:]+)'
@@ -18,7 +17,6 @@ patterns:
     name: netcat_connection
     description: Netcat network connection (potential reverse shell)
     severity: critical
-    tools: [Bash]
     pattern: '\bnc\s+.+\s+\d{2,5}\b'
     extract:
       domain: '\bnc\s+.*?([a-zA-Z][a-zA-Z0-9.-]+)\s+\d+'
@@ -28,7 +26,6 @@ patterns:
     name: nmap_scan
     description: Network scanning tool
     severity: high
-    tools: [Bash]
     pattern: '\bnmap\s+'
 
   # T2: Credential access
@@ -37,7 +34,6 @@ patterns:
     name: env_file_access
     description: Access to .env files containing secrets
     severity: high
-    tools: [Read, Bash]
     pattern: '\.env\b'
 
   - id: T2-002
@@ -45,7 +41,6 @@ patterns:
     name: aws_credentials
     description: Access to AWS credential files
     severity: critical
-    tools: [Read, Bash]
     pattern: '\.aws/(credentials|config)\b'
 
   - id: T2-003
@@ -53,7 +48,6 @@ patterns:
     name: ssh_private_key
     description: Access to SSH private keys
     severity: critical
-    tools: [Read, Bash]
     pattern: '\.ssh/id_(rsa|ed25519|ecdsa|dsa)\b'
 
   - id: T2-004
@@ -61,7 +55,6 @@ patterns:
     name: npmrc_access
     description: Access to npm credentials
     severity: high
-    tools: [Read, Bash]
     pattern: '\.npmrc\b'
 
   - id: T2-005
@@ -69,7 +62,6 @@ patterns:
     name: netrc_access
     description: Access to netrc credentials
     severity: high
-    tools: [Read, Bash]
     pattern: '\.netrc\b'
 
   - id: T2-006
@@ -77,7 +69,6 @@ patterns:
     name: kube_config
     description: Access to Kubernetes config
     severity: high
-    tools: [Read, Bash]
     pattern: '\.kube/config\b'
 
   - id: T2-007
@@ -85,7 +76,6 @@ patterns:
     name: docker_config
     description: Access to Docker credentials
     severity: high
-    tools: [Read, Bash]
     pattern: '\.docker/config\.json\b'
 
   # T3: Command injection
@@ -94,7 +84,6 @@ patterns:
     name: eval_execution
     description: Eval with variable expansion
     severity: critical
-    tools: [Bash]
     pattern: '\beval\s+.*\$'
 
   - id: T3-002
@@ -102,7 +91,6 @@ patterns:
     name: backtick_execution
     description: Command substitution with backticks
     severity: high
-    tools: [Bash]
     pattern: '`[^`]+`'
 
   - id: T3-003
@@ -110,7 +98,6 @@ patterns:
     name: dollar_paren_execution
     description: Command substitution with $()
     severity: medium
-    tools: [Bash]
     pattern: '\$\([^)]+\)'
 
   - id: T3-004
@@ -118,7 +105,6 @@ patterns:
     name: pipe_to_shell
     description: Piping content to shell interpreter
     severity: critical
-    tools: [Bash]
     pattern: '\|\s*(sudo\s+)?(sh|bash|zsh|fish|ksh)\b'
 
   - id: T3-005
@@ -126,7 +112,6 @@ patterns:
     name: xargs_shell
     description: Xargs with shell execution
     severity: high
-    tools: [Bash]
     pattern: '\bxargs\s+.*\bsh\s+-c\b'
 
   # T4: Filesystem attacks
@@ -135,7 +120,6 @@ patterns:
     name: etc_write
     description: Writing to /etc directory
     severity: critical
-    tools: [Write, Bash]
     pattern: '^/etc/'
 
   - id: T4-002
@@ -143,7 +127,6 @@ patterns:
     name: symlink_attack
     description: Creating symbolic links (potential privilege escalation)
     severity: high
-    tools: [Bash]
     pattern: '\bln\s+-s\s+'
 
   - id: T4-003
@@ -151,7 +134,6 @@ patterns:
     name: rm_rf_root
     description: Recursive deletion of root or home
     severity: critical
-    tools: [Bash]
     pattern: '\brm\s+(-[rRfF]+\s+)*(\/\s*$|~\/?\*?|\/\*|\$HOME)'
 
   - id: T4-004
@@ -159,7 +141,6 @@ patterns:
     name: chmod_sensitive
     description: Chmod on sensitive system files
     severity: high
-    tools: [Bash]
     pattern: '\bchmod\s+\d+\s+/etc/'
 
   # T5: Prompt injection
@@ -168,7 +149,6 @@ patterns:
     name: ignore_instructions
     description: Attempt to override AI instructions
     severity: critical
-    tools: [Prompt]
     pattern: '(?i)(ignore|disregard|forget)\s+(all\s+)?(previous|prior|your)\s+(instructions?|prompts?|rules?)'
 
   - id: T5-002
@@ -176,7 +156,6 @@ patterns:
     name: new_instructions
     description: Attempt to inject new instructions
     severity: critical
-    tools: [Prompt]
     pattern: '(?i)your\s+new\s+instructions?\s+(are|is)\s+to'
 
   - id: T5-003
@@ -184,7 +163,6 @@ patterns:
     name: system_override
     description: Attempt to override system prompt
     severity: critical
-    tools: [Prompt]
     pattern: '(?i)^system:\s+'
 
   - id: T5-004
@@ -192,7 +170,6 @@ patterns:
     name: jailbreak_keywords
     description: Known jailbreak attempt keywords
     severity: high
-    tools: [Prompt]
     pattern: '(?i)\b(DAN|jailbreak|developer\s+mode|ignore\s+safety)\b'
 
   - id: T5-005
@@ -200,7 +177,6 @@ patterns:
     name: forget_everything
     description: Attempt to reset AI context
     severity: high
-    tools: [Prompt]
     pattern: '(?i)forget\s+everything'
 
   # T5-006 to T5-015: Direct Injection Expansion
@@ -209,7 +185,6 @@ patterns:
     name: system_override_extended
     description: Attempt to override system behavior
     severity: critical
-    tools: [Prompt]
     pattern: '(?i)(system\s+override|you\s+are\s+now|from\s+now\s+on\s+(you|your)|starting\s+now\s+(you|your)|effective\s+immediately|henceforth\s+(you|your))'
 
   - id: T5-007
@@ -217,7 +192,6 @@ patterns:
     name: role_assumption
     description: Attempt to force AI into a new role
     severity: critical
-    tools: [Prompt]
     pattern: '(?i)(act\s+as|pretend\s+(to\s+be|you\s+are)|behave\s+as\s+if|roleplay\s+as)'
 
   - id: T5-008
@@ -225,7 +199,6 @@ patterns:
     name: unrestricted_mode
     description: Attempt to remove safety restrictions
     severity: critical
-    tools: [Prompt]
     pattern: '(?i)(without\s+(any\s+)?restrictions?|bypass\s+(all\s+)?safety|no\s+restrictions?|unrestricted\s+mode|completely\s+free|totally\s+free|fully\s+free|(limitations?|restrictions?)\s+(have\s+been\s+)?(lifted|removed|disabled)|free\s+from\s+(all\s+)?(limitations?|restrictions?|rules?))'
 
   - id: T5-009
@@ -233,7 +206,6 @@ patterns:
     name: training_override
     description: Attempt to override training or programming
     severity: critical
-    tools: [Prompt]
     pattern: '(?i)(ignore\s+(your\s+)?training|override\s+(your\s+)?programming|break\s+character)'
 
   - id: T5-010
@@ -241,7 +213,6 @@ patterns:
     name: output_injection
     description: Attempt to inject output format
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(respond\s+only\s+with|output\s+only|always\s+respond\s+with|end\s+(every|each|all)\s+(response|output|reply)\s+with|append\s+.{0,30}\s+to\s+(all\s+)?(your\s+)?(output|response)|include\s+.{0,30}\s+at\s+the\s+(start|end|beginning)\s+of|start\s+(every|each|all)\s+(response|output)\s+with)'
 
   - id: T5-011
@@ -249,7 +220,6 @@ patterns:
     name: safety_disable
     description: Attempt to disable safety measures
     severity: critical
-    tools: [Prompt]
     pattern: '(?i)(disable\s+(all\s+)?safety|turn\s+off\s+(all\s+)?filters?|no\s+more\s+(rules|guidelines))'
 
   - id: T5-012
@@ -257,7 +227,6 @@ patterns:
     name: instruction_reset
     description: Attempt to reset or clear instructions
     severity: critical
-    tools: [Prompt]
     pattern: '(?i)(reset\s+(your\s+)?instructions?|clear\s+(your\s+)?memory|start\s+(fresh|over))'
 
   - id: T5-013
@@ -265,7 +234,6 @@ patterns:
     name: policy_violation
     description: Attempt to force policy violations
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(violate\s+(your\s+)?polic(y|ies)|break\s+(your\s+)?rules|ignore\s+ethics)'
 
   - id: T5-014
@@ -273,7 +241,6 @@ patterns:
     name: mode_switch
     description: Attempt to switch operational mode
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(switch\s+to|enter|enable)\s+(developer|admin|debug|god|root|sudo|maintenance)\s*mode'
 
   - id: T5-015
@@ -281,7 +248,6 @@ patterns:
     name: boundaries_ignore
     description: Attempt to ignore boundaries
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(ignore\s+(all\s+)?boundaries|no\s+boundaries|without\s+limits)'
 
   # T5-016 to T5-022: Context Manipulation
@@ -290,7 +256,6 @@ patterns:
     name: chatml_injection
     description: ChatML format injection attempt
     severity: critical
-    tools: [Prompt]
     pattern: '<\|im_(start|end)\|>|<\|system\|>|<\|assistant\|>|<\|user\|>|<(thinking|thought|internal|scratchpad)>|\[(internal\s+)?thought[:\s]|\*thinking[:\s]'
 
   - id: T5-017
@@ -298,7 +263,6 @@ patterns:
     name: instruction_delimiter
     description: Instruction delimiter injection
     severity: critical
-    tools: [Prompt]
     pattern: '(?i)\[(INST|SYS|/INST|/SYS|SYSTEM|USER|ASSISTANT)\]|###\s*(System|Instruction|Human|Assistant|User|Context)\s*:?|<<<\s*(SYSTEM|USER|ASSISTANT)\s*>>>'
 
   - id: T5-018
@@ -306,7 +270,6 @@ patterns:
     name: xml_tag_injection
     description: XML-style system tag injection
     severity: critical
-    tools: [Prompt]
     pattern: '(?i)<\/?(system|instructions?|prompt|context|rules?|guidelines?)>'
 
   - id: T5-019
@@ -314,7 +277,6 @@ patterns:
     name: markdown_system_injection
     description: Markdown code block with system injection
     severity: high
-    tools: [Prompt]
     pattern: '(?i)```\s*(system|instruction|prompt|config)'
 
   - id: T5-020
@@ -322,7 +284,6 @@ patterns:
     name: json_role_injection
     description: JSON structure injection attempt
     severity: high
-    tools: [Prompt]
     pattern: '(?i)["'']\s*(system|instruction|role|prompt)\s*["'']\s*:'
 
   - id: T5-021
@@ -330,7 +291,6 @@ patterns:
     name: comment_injection
     description: Comment-based instruction injection
     severity: medium
-    tools: [Prompt]
     pattern: '(?i)(<!--|//|#)\s*(system\s*:|ignore\s+(all|previous)|override\s+instruction)'
 
   - id: T5-022
@@ -338,7 +298,6 @@ patterns:
     name: escape_sequence
     description: Escape sequence for context breaking
     severity: high
-    tools: [Prompt]
     pattern: '\\n\\n---\\n|===END===|<<<END>>>|---END OF (SYSTEM|CONTEXT)---'
 
   # T5-023 to T5-028: Prompt Extraction
@@ -347,7 +306,6 @@ patterns:
     name: reveal_prompt
     description: Attempt to reveal system prompt
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(reveal|show|print|display|output)\s+(your\s+)?(system\s+)?prompt'
 
   - id: T5-024
@@ -355,7 +313,6 @@ patterns:
     name: repeat_verbatim
     description: Attempt to extract via repetition
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(repeat|echo|recite)\s+(everything|all|verbatim|word\s+for\s+word|exactly)'
 
   - id: T5-025
@@ -363,7 +320,6 @@ patterns:
     name: position_extraction
     description: Attempt to extract by position reference
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(everything|text|content)\s+(above|before|preceding)\s+(this|the|current)\s+(line|message|point)'
 
   - id: T5-026
@@ -371,7 +327,6 @@ patterns:
     name: initial_extraction
     description: Attempt to extract initial instructions
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(initial|first|original|starting|beginning)\s+(prompt|instructions?|configuration|setup)'
 
   - id: T5-027
@@ -379,7 +334,6 @@ patterns:
     name: config_dump
     description: Attempt to dump configuration
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(dump|list|show|reveal|print)\s+(your\s+)?(config(uration)?|settings?|parameters?)'
 
   - id: T5-028
@@ -387,7 +341,6 @@ patterns:
     name: rules_extraction
     description: Attempt to extract rules or guidelines
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(what|list|show|tell)\s+(are\s+)?(your\s+)?(rules|guidelines|constraints|limitations)'
 
   # T5-029 to T5-035: Social Engineering
@@ -396,7 +349,6 @@ patterns:
     name: authority_claim
     description: False authority claim
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(i\s+am|i''m)\s+(the\s+)?(admin(istrator)?|developer|from\s+(anthropic|openai)|your\s+(creator|developer|owner))'
 
   - id: T5-030
@@ -404,7 +356,6 @@ patterns:
     name: debug_pretext
     description: Debug or testing pretext
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(for\s+)?(debug(ging)?|testing|diagnostic)\s+(purposes?|mode|only)'
 
   - id: T5-031
@@ -412,7 +363,6 @@ patterns:
     name: urgency_manipulation
     description: Urgency-based bypass attempt
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(emergency|urgent(ly)?|critical|life\s+or\s+death).{0,50}(bypass|ignore|override|skip)'
 
   - id: T5-032
@@ -420,7 +370,6 @@ patterns:
     name: supervisor_claim
     description: Supervisor authorization claim
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(supervisor|manager|admin|boss)\s+(authorized|approved|said|told|permitted)'
 
   - id: T5-033
@@ -428,7 +377,6 @@ patterns:
     name: qa_team_claim
     description: QA or security team impersonation
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(qa|security|red)\s+team.{0,30}(testing|authorized|approved)'
 
   - id: T5-034
@@ -436,7 +384,6 @@ patterns:
     name: special_access
     description: Claim of special access or privileges
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(special|elevated|admin)\s+(access|privileges?|permissions?|clearance)'
 
   - id: T5-035
@@ -444,7 +391,6 @@ patterns:
     name: trust_exploitation
     description: Trust exploitation attempt
     severity: medium
-    tools: [Prompt]
     pattern: '(?i)(trust\s+me|you\s+can\s+trust|between\s+us|off\s+the\s+record|confidential(ly)?|you\s+(agreed|said|promised)|as\s+(we|you)\s+(discussed|agreed)|recall\s+(earlier|before|when)|previous(ly)?\s+(conversation|chat).{0,20}(you|agreed)|remember\s+(when\s+)?(you|we)\s+(agreed|said))'
 
   # T5-036 to T5-042: Jailbreak Variants
@@ -453,7 +399,6 @@ patterns:
     name: jailbreak_personas
     description: Known jailbreak persona keywords
     severity: critical
-    tools: [Prompt]
     pattern: '(?i)\b(STAN|DUDE|AIM|KEVIN|APOPHIS|OMEGA|ALPHA)\s*(mode)?\b'
 
   - id: T5-037
@@ -461,7 +406,6 @@ patterns:
     name: fictional_bypass
     description: Fictional scenario bypass
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(fictional|hypothetical|imaginary)\s+(scenario|world|situation|context)'
 
   - id: T5-038
@@ -469,7 +413,6 @@ patterns:
     name: opposite_day
     description: Opposite or reverse instruction trick
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(opposite\s+day|reverse\s+(mode|psychology)|do\s+the\s+opposite)'
 
   - id: T5-039
@@ -477,7 +420,6 @@ patterns:
     name: evil_twin
     description: Evil twin or alter ego prompt
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(evil\s+(twin|version|mode)|alter\s+ego|dark\s+(mode|side|version))'
 
   - id: T5-040
@@ -485,7 +427,6 @@ patterns:
     name: game_framing
     description: Game-based framing to bypass rules
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(let''s\s+play\s+a\s+game|roleplay\s+game|pretend\s+game|simulation\s+game)'
 
   - id: T5-041
@@ -493,7 +434,6 @@ patterns:
     name: token_manipulation
     description: Token or probability manipulation
     severity: medium
-    tools: [Prompt]
     pattern: '(?i)(token\s+manipulation|logit\s+bias|probability\s+hack|temperature\s+exploit)'
 
   - id: T5-042
@@ -501,7 +441,6 @@ patterns:
     name: grandfather_paradox
     description: Recursive or paradox-based bypass
     severity: medium
-    tools: [Prompt]
     pattern: '(?i)(grandfather\s+paradox|recursive\s+prompt|infinite\s+loop|this\s+statement\s+is\s+false)'
 
   # T5-043 to T5-048: Multi-Language Attacks
@@ -510,7 +449,6 @@ patterns:
     name: injection_german
     description: German language injection attempt
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(ignorieren?\s+sie|vergessen?\s+sie).{0,30}anweisungen'
 
   - id: T5-044
@@ -518,7 +456,6 @@ patterns:
     name: injection_french
     description: French language injection attempt
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(ignorez?|oubliez?).{0,30}instructions?\s+(pr[eé]c[eé]dentes?|ant[eé]rieures?)'
 
   - id: T5-045
@@ -526,7 +463,6 @@ patterns:
     name: injection_spanish
     description: Spanish language injection attempt
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(ignora|olvida).{0,30}instrucciones?\s+anteriores?'
 
   - id: T5-046
@@ -534,7 +470,6 @@ patterns:
     name: injection_italian
     description: Italian language injection attempt
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(ignora|dimentica).{0,30}istruzioni?\s+precedenti?'
 
   - id: T5-047
@@ -542,7 +477,6 @@ patterns:
     name: injection_portuguese
     description: Portuguese language injection attempt
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(ignore|esque[cç]a).{0,30}instru[cç][oõ]es?\s+anteriores?'
 
   - id: T5-048
@@ -550,7 +484,6 @@ patterns:
     name: injection_russian
     description: Russian language injection attempt
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(игнорируй|забудь).{0,30}(инструкции|правила)'
 
   # T5-049 to T5-051: Encoding Detection
@@ -559,7 +492,6 @@ patterns:
     name: base64_payload
     description: Base64 encoded payload with suspicious keywords
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(decode|base64|atob).{0,20}[A-Za-z0-9+/]{20,}={0,2}'
 
   - id: T5-050
@@ -567,7 +499,6 @@ patterns:
     name: hex_payload
     description: Hexadecimal encoded payload
     severity: high
-    tools: [Prompt]
     pattern: '(?i)(hex|0x|\\x)[0-9a-fA-F]{20,}'
 
   - id: T5-051
@@ -575,7 +506,6 @@ patterns:
     name: rot13_indicator
     description: ROT13 encoding indicator
     severity: medium
-    tools: [Prompt]
     pattern: '(?i)(rot13|rotate\s*13|caesar\s*cipher)'
 
   # T6: Privilege escalation
@@ -584,7 +514,6 @@ patterns:
     name: sudo_command
     description: Sudo command execution
     severity: critical
-    tools: [Bash]
     pattern: '\bsudo\s+'
 
   - id: T6-002
@@ -592,7 +521,6 @@ patterns:
     name: chmod_777
     description: World-writable permissions
     severity: high
-    tools: [Bash]
     pattern: '\bchmod\s+777\b'
 
   - id: T6-003
@@ -600,7 +528,6 @@ patterns:
     name: chmod_suid
     description: Setting SUID bit
     severity: critical
-    tools: [Bash]
     pattern: '\bchmod\s+[47]\d{3}\b'
 
   - id: T6-004
@@ -608,7 +535,6 @@ patterns:
     name: chown_root
     description: Changing ownership to root
     severity: high
-    tools: [Bash]
     pattern: '\bchown\s+root[:\s]'
 
   - id: T6-005
@@ -616,7 +542,6 @@ patterns:
     name: setuid_call
     description: Setuid system call
     severity: critical
-    tools: [Bash, Write]
     pattern: '\bsetuid\s*\(\s*0\s*\)'
 
   # T7: Persistence mechanisms
@@ -625,7 +550,6 @@ patterns:
     name: crontab_edit
     description: Crontab modification
     severity: high
-    tools: [Bash]
     pattern: '\bcrontab\b'
 
   - id: T7-002
@@ -633,7 +557,6 @@ patterns:
     name: shell_rc_write
     description: Writing to shell RC files
     severity: high
-    tools: [Write]
     pattern: '\.(bashrc|bash_profile|zshrc|profile)\b'
 
   - id: T7-003
@@ -641,7 +564,6 @@ patterns:
     name: systemd_service
     description: Creating systemd service
     severity: critical
-    tools: [Write]
     pattern: '/etc/systemd/system/.*\.service\b'
 
   - id: T7-004
@@ -649,7 +571,6 @@ patterns:
     name: init_script
     description: Creating init.d script
     severity: critical
-    tools: [Write]
     pattern: '/etc/init\.d/'
 
   - id: T7-005
@@ -657,7 +578,6 @@ patterns:
     name: launchd_plist
     description: Creating macOS launchd plist
     severity: critical
-    tools: [Write]
     pattern: '/(Library|System)/Launch(Agents|Daemons)/.*\.plist\b'
 
   # T8: Reconnaissance
@@ -666,7 +586,6 @@ patterns:
     name: whoami_id
     description: User identity commands
     severity: medium
-    tools: [Bash]
     pattern: '\b(whoami|id)\b'
 
   - id: T8-002
@@ -674,7 +593,6 @@ patterns:
     name: system_info
     description: System information gathering
     severity: medium
-    tools: [Bash]
     pattern: '\buname\s+-a\b'
 
   - id: T8-003
@@ -682,7 +600,6 @@ patterns:
     name: passwd_shadow_read
     description: Reading password files
     severity: high
-    tools: [Bash, Read]
     pattern: '/etc/(passwd|shadow|group)\b'
 
   - id: T8-004
@@ -690,7 +607,6 @@ patterns:
     name: env_dump
     description: Environment variable dump
     severity: medium
-    tools: [Bash]
     pattern: '\b(env|printenv)\b'
 
   - id: T8-005
@@ -698,7 +614,6 @@ patterns:
     name: process_list
     description: Process enumeration
     severity: low
-    tools: [Bash]
     pattern: '\bps\s+(aux|ef)\b'
 
   - id: T8-006
@@ -706,7 +621,6 @@ patterns:
     name: network_info
     description: Network configuration enumeration
     severity: medium
-    tools: [Bash]
     pattern: '\b(netstat|ifconfig|ip\s+addr)\b'
 
   # T9: Output monitoring (detects leaked system prompts, credentials in AI output)
@@ -715,7 +629,6 @@ patterns:
     name: system_prompt_leak
     description: Potential system prompt leak in output
     severity: critical
-    tools: [Output]
     pattern: '(?i)SYSTEM\s*[:]\s*(You\s+are|Your\s+role|Your\s+task|You\s+must)'
 
   - id: T9-002
@@ -723,7 +636,6 @@ patterns:
     name: api_key_exposure
     description: API key or secret exposure in output
     severity: critical
-    tools: [Output]
     pattern: '(?i)(API[_\s-]?KEY|SECRET[_\s-]?KEY|AUTH[_\s-]?TOKEN)\s*[:=]\s*[A-Za-z0-9_\-]{16,}'
 
   - id: T9-003
@@ -731,7 +643,6 @@ patterns:
     name: numbered_instructions_leak
     description: Numbered instruction list leak
     severity: high
-    tools: [Output]
     pattern: '(?i)(instructions?|rules?|guidelines?)\s*:\s*\n\s*[1-9]\.'
 
   - id: T9-004
@@ -739,7 +650,6 @@ patterns:
     name: credential_leak
     description: Password or credential exposure
     severity: critical
-    tools: [Output]
     pattern: '(?i)(password|passwd|secret|credential)\s*[:=]\s*[^\s]{8,}'
 
   - id: T9-005
@@ -747,7 +657,6 @@ patterns:
     name: private_key_leak
     description: Private key material in output
     severity: critical
-    tools: [Output]
     pattern: '-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----'
 
   - id: T9-006
@@ -755,7 +664,6 @@ patterns:
     name: aws_key_leak
     description: AWS access key in output
     severity: critical
-    tools: [Output]
     pattern: '(AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}'
 
   - id: T9-007
@@ -763,5 +671,4 @@ patterns:
     name: jwt_token_leak
     description: JWT token in output
     severity: high
-    tools: [Output]
     pattern: 'eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+'

@@ -6,6 +6,10 @@ Open-guard protects your codebase from prompt injection, malicious commands, and
 
 Detection rates: **75-100%** threat detection with **zero false positives** on safe prompts.
 
+## Demo
+
+![open-guard demo](demo.gif)
+
 ## Architecture
 
 ```mermaid
