@@ -36,3 +36,4 @@ dist/
 
 # Local config (user overrides)
 *.local.yaml
+.open-guard.yaml

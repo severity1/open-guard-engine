@@ -178,7 +178,7 @@ Output is JSON with decision (allow/block/confirm) and threat details.`,
 			}
 
 			// Layer 1: Pattern matching (fast, deterministic)
-			results := matcher.Match("Prompt", analysisContent)
+			results := matcher.Match(analysisContent)
 			if len(results) > 0 {
 				highestSeverity := patterns.HighestSeverity(results)
 				primaryResult := results[0]

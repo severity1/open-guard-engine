@@ -6,6 +6,10 @@ Open-guard protects your codebase from prompt injection, malicious commands, and
 
 Detection rates: **75-100%** threat detection with **zero false positives** on safe prompts.
 
+## Demo
+
+![open-guard demo](demo.gif)
+
 ## Architecture
 
 ```mermaid
@@ -105,7 +109,7 @@ cat prompt.txt | open-guard analyze
 
 ## Configuration
 
-Create `.open-guard.yaml` in your project root or `~/.open-guard/config.yaml` globally:
+Copy `.open-guard.yaml.example` to `.open-guard.yaml` and customize, or create the file in `~/.open-guard/config.yaml` globally:
 
 ```yaml
 mode: confirm  # strict | confirm | permissive
