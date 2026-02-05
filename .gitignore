@@ -37,3 +37,6 @@ dist/
 # Local config (user overrides)
 *.local.yaml
 .open-guard.yaml
+
+# Claude Code auto-memory
+.claude/auto-memory/dirty-files
