@@ -77,7 +77,13 @@ func newCheckCmd() *cobra.Command {
 		Long:  "Validates the configuration file and reports any issues.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Load config
-			cfg, err := config.Load(projectRoot)
+			var cfg *config.Config
+			var err error
+			if configPath != "" {
+				cfg, err = config.LoadFromPath(configPath)
+			} else {
+				cfg, err = config.Load(projectRoot)
+			}
 			if err != nil {
 				return fmt.Errorf("configuration error: %w", err)
 			}
@@ -141,7 +147,12 @@ Output is JSON with decision (allow/block/confirm) and threat details.`,
 			}
 
 			// Load config
-			cfg, err := config.Load(projectRoot)
+			var cfg *config.Config
+			if configPath != "" {
+				cfg, err = config.LoadFromPath(configPath)
+			} else {
+				cfg, err = config.Load(projectRoot)
+			}
 			if err != nil {
 				return fmt.Errorf("loading config: %w", err)
 			}

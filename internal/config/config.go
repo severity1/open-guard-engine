@@ -79,6 +79,46 @@ func Load(projectRoot string) (*Config, error) {
 	return LoadWithHome(projectRoot, homeDir)
 }
 
+// LoadFromPath loads configuration from an explicit file path.
+// Unlike Load(), this returns an error if the file doesn't exist.
+// Priority: explicit path > global config > defaults
+func LoadFromPath(path string) (*Config, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		homeDir = ""
+	}
+	return LoadFromPathWithHome(path, homeDir)
+}
+
+// LoadFromPathWithHome loads configuration from an explicit file path with an explicit home directory.
+// Used for testing to avoid depending on actual home directory.
+func LoadFromPathWithHome(path, homeDir string) (*Config, error) {
+	if path == "" {
+		return nil, fmt.Errorf("config path cannot be empty")
+	}
+
+	cfg := DefaultConfig()
+
+	// Load global config first
+	if homeDir != "" {
+		globalPath := filepath.Join(homeDir, ".open-guard", "config.yaml")
+		if err := loadAndMerge(cfg, globalPath); err != nil {
+			return nil, fmt.Errorf("loading global config: %w", err)
+		}
+	}
+
+	// Load explicit config file (must exist)
+	if err := loadAndMergeRequired(cfg, path); err != nil {
+		return nil, err
+	}
+
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+
+	return cfg, nil
+}
+
 // LoadWithHome loads configuration with an explicit home directory.
 // Used for testing to avoid depending on actual home directory.
 func LoadWithHome(projectRoot, homeDir string) (*Config, error) {
@@ -108,6 +148,7 @@ func LoadWithHome(projectRoot, homeDir string) (*Config, error) {
 }
 
 // loadAndMerge loads a config file and merges it into the existing config.
+// If the file doesn't exist, this is not an error - it simply returns without changes.
 func loadAndMerge(cfg *Config, path string) error {
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
@@ -116,6 +157,26 @@ func loadAndMerge(cfg *Config, path string) error {
 	if err != nil {
 		return err
 	}
+
+	return mergeConfigData(cfg, data, path)
+}
+
+// loadAndMergeRequired loads a config file and merges it into the existing config.
+// Unlike loadAndMerge, this returns an error if the file doesn't exist.
+func loadAndMergeRequired(cfg *Config, path string) error {
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return fmt.Errorf("config file not found: %s", path)
+	}
+	if err != nil {
+		return fmt.Errorf("reading config file: %w", err)
+	}
+
+	return mergeConfigData(cfg, data, path)
+}
+
+// mergeConfigData parses config data and merges it into the existing config.
+func mergeConfigData(cfg *Config, data []byte, path string) error {
 
 	var fileCfg Config
 	if err := yaml.Unmarshal(data, &fileCfg); err != nil {

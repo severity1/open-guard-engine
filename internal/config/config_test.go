@@ -250,3 +250,90 @@ ml_enabled: true
 	// ml_enabled: true should enable LLM with defaults
 	assert.True(t, cfg.LLM.Enabled)
 }
+
+func TestLoadFromPath_ValidFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	configContent := `
+mode: strict
+llm:
+  enabled: false
+agent:
+  enabled: true
+  provider: claude
+`
+	configPath := filepath.Join(tmpDir, "custom-config.yaml")
+	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	require.NoError(t, err)
+
+	cfg, err := LoadFromPathWithHome(configPath, "")
+	require.NoError(t, err)
+
+	assert.Equal(t, ModeStrict, cfg.Mode)
+	assert.False(t, cfg.LLM.Enabled)
+	assert.True(t, cfg.Agent.Enabled)
+	assert.Equal(t, "claude", cfg.Agent.Provider)
+}
+
+func TestLoadFromPath_NonExistent(t *testing.T) {
+	_, err := LoadFromPathWithHome("/nonexistent/path/config.yaml", "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "config file not found")
+}
+
+func TestLoadFromPath_InvalidYAML(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "invalid.yaml")
+	err := os.WriteFile(configPath, []byte("invalid: yaml: content:"), 0644)
+	require.NoError(t, err)
+
+	_, err = LoadFromPathWithHome(configPath, "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "parsing")
+}
+
+func TestLoadFromPath_MergesWithGlobal(t *testing.T) {
+	// Create temp directories for global config and explicit config
+	homeDir := t.TempDir()
+	configDir := t.TempDir()
+
+	// Set up global config path
+	globalDir := filepath.Join(homeDir, ".open-guard")
+	err := os.MkdirAll(globalDir, 0755)
+	require.NoError(t, err)
+
+	// Create global config (sets agent model)
+	globalConfig := `
+agent:
+  model: global-model
+  provider: claude
+`
+	err = os.WriteFile(filepath.Join(globalDir, "config.yaml"), []byte(globalConfig), 0644)
+	require.NoError(t, err)
+
+	// Create explicit config (sets mode but not agent model)
+	explicitConfig := `
+mode: strict
+agent:
+  enabled: true
+`
+	explicitPath := filepath.Join(configDir, "my-config.yaml")
+	err = os.WriteFile(explicitPath, []byte(explicitConfig), 0644)
+	require.NoError(t, err)
+
+	// Load with explicit path
+	cfg, err := LoadFromPathWithHome(explicitPath, homeDir)
+	require.NoError(t, err)
+
+	// Explicit config value should be applied
+	assert.Equal(t, ModeStrict, cfg.Mode)
+	assert.True(t, cfg.Agent.Enabled)
+	// Global config values should be preserved for fields not set in explicit config
+	assert.Equal(t, "global-model", cfg.Agent.Model)
+	assert.Equal(t, "claude", cfg.Agent.Provider)
+}
+
+func TestLoadFromPath_EmptyPath(t *testing.T) {
+	_, err := LoadFromPathWithHome("", "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "config path cannot be empty")
+}
