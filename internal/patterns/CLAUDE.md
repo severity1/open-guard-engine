@@ -1,0 +1,81 @@
+# patterns
+
+<!-- AUTO-MANAGED: module-description -->
+## Purpose
+
+Regex-based threat pattern matching engine. Layer 1 in the detection pipeline - fast, deterministic matching against 93 patterns covering technical threats (T1-T9) including prompt injection (T5).
+
+<!-- END AUTO-MANAGED -->
+
+<!-- AUTO-MANAGED: architecture -->
+## Module Architecture
+
+```
+patterns/
+├── matcher.go        # Pattern matching engine
+├── matcher_test.go   # Test coverage
+└── patterns.yaml     # Embedded pattern definitions (93 patterns)
+```
+
+**Key Types:**
+- `Matcher` - Pattern matching engine with pre-compiled regex
+- `CompiledPattern` - Pattern with compiled regex and extract rules
+- `MatchResult` - Match details including extracted values
+- `PatternDef` - YAML pattern definition structure
+
+**Pattern Categories:**
+| Category | Description | Count |
+|----------|-------------|-------|
+| T1 | Network exfiltration | 3 |
+| T2 | Credential access | 7 |
+| T3 | Command injection | 5+ |
+| T4 | Filesystem attacks | 5+ |
+| T5 | Prompt injection | 51 |
+| T6 | Privilege escalation | 5+ |
+| T7 | Persistence mechanisms | 5+ |
+| T8 | Reconnaissance | 5+ |
+| T9 | Output monitoring | 5+ |
+
+<!-- END AUTO-MANAGED -->
+
+<!-- AUTO-MANAGED: conventions -->
+## Module-Specific Conventions
+
+**Embedded Patterns:**
+- Uses `//go:embed patterns.yaml` for single-binary distribution
+- Patterns compiled at startup via `NewMatcher()`
+- Compilation errors are fatal (returned from constructor)
+
+**Pattern YAML Structure:**
+```yaml
+patterns:
+  - id: T5-001
+    category: T5
+    name: pattern_name
+    description: Human-readable description
+    severity: critical|high|medium|low
+    pattern: 'regex pattern'
+    extract:
+      field_name: 'extraction regex'
+```
+
+**Matching Behavior:**
+- Returns all matching patterns (not short-circuit)
+- `HighestSeverity()` helper for prioritization
+- Extraction patterns capture named groups
+
+<!-- END AUTO-MANAGED -->
+
+<!-- AUTO-MANAGED: dependencies -->
+## Key Dependencies
+
+- `regexp` - Standard library regex
+- `gopkg.in/yaml.v3` - YAML parsing for patterns
+- Internal: `types` - Threat category and level types
+
+<!-- END AUTO-MANAGED -->
+
+<!-- MANUAL -->
+## Module Notes
+
+<!-- END MANUAL -->
