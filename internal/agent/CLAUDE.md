@@ -37,6 +37,13 @@ The analyzer runs in a hardened sandbox:
 - Ollama requires env var setup via `setupOllamaEnv()`
 - Cleanup functions restore original env vars
 
+**Context & Timeout Handling:**
+- `Analyze()` accepts context for timeout and cancellation
+- Checks `ctx.Done()` before each iterator iteration
+- Distinguishes `ctx.Err()` from operation errors
+- Returns context errors immediately without wrapping
+- `IsAvailable()` uses 3s timeout via `exec.CommandContext`
+
 **Response Parsing:**
 - Expected format: `"SAFE"` or `"INJECTION: reason"`
 - Case-insensitive matching with `strings.ToUpper()`
