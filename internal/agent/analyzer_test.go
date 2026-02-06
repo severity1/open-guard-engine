@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 
@@ -342,4 +343,38 @@ func TestInjectionAnalysisPrompt_Structure(t *testing.T) {
 	assert.Contains(t, prompt, "ENCODING:")
 	assert.Contains(t, prompt, "BEGIN_UNTRUSTED")
 	assert.Contains(t, prompt, "END_UNTRUSTED")
+}
+
+// --- Tests for #14: Context cancellation in iterator loop ---
+
+func TestAnalyze_AlreadyCancelledContext(t *testing.T) {
+	analyzer := NewClaudeAnalyzer("claude-sonnet-4-20250514", ".", "claude", "")
+
+	// Create an already-cancelled context
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	result, err := analyzer.Analyze(ctx, "test content")
+
+	// Should return context.Canceled error, not hang or succeed
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.True(t, errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded),
+		"error should be a context error, got: %v", err)
+}
+
+func TestAnalyze_DeadlineExceeded(t *testing.T) {
+	analyzer := NewClaudeAnalyzer("claude-sonnet-4-20250514", ".", "claude", "")
+
+	// Create a context that's already past its deadline
+	ctx, cancel := context.WithTimeout(context.Background(), 0)
+	defer cancel()
+
+	result, err := analyzer.Analyze(ctx, "test content")
+
+	// Should return deadline exceeded error
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.True(t, errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded),
+		"error should be a context error, got: %v", err)
 }
