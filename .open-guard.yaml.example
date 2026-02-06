@@ -3,12 +3,17 @@
 
 mode: confirm  # strict | confirm | permissive
 
+# Maximum input size in bytes (default: 10485760 = 10MB)
+# Prevents OOM from unbounded stdin reads
+# max_input_size: 10485760
+
 # LLM - Content Safety Detection (S1-S13)
 # Requires Ollama running locally with llama-guard3
 llm:
   enabled: true
   endpoint: http://localhost:11434
   content_safety_model: llama-guard3:latest
+  timeout_seconds: 30  # HTTP request timeout
 
 # Agent - Prompt Injection Detection (T5)
 # Uses Claude Code CLI as the agent harness
@@ -18,3 +23,4 @@ agent:
   provider: claude          # "claude" (recommended) or "ollama"
   model: claude-sonnet-4-20250514  # Sonnet recommended for semantic detection
   # endpoint: http://localhost:11434  # Only needed for ollama provider
+  timeout_seconds: 60  # Analysis timeout

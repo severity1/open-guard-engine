@@ -17,9 +17,9 @@ config/
 ```
 
 **Key Types:**
-- `Config` - Root configuration struct
-- `LLMConfig` - Ollama content safety settings
-- `AgentConfig` - Claude/Ollama agent detection settings
+- `Config` - Root configuration struct with MaxInputSize (10MB default)
+- `LLMConfig` - Ollama content safety settings with TimeoutSeconds (30s default)
+- `AgentConfig` - Claude/Ollama agent detection settings with TimeoutSeconds (60s default)
 - `Mode` - Decision mode (strict/confirm/permissive)
 
 **Config Loading Functions:**
@@ -36,6 +36,11 @@ config/
 1. Explicit file path (required)
 2. Global config: `~/.open-guard/config.yaml`
 3. Defaults: `DefaultConfig()`
+
+**Resource Limits:**
+- `MaxInputSize` - Maximum stdin bytes (default: 10MB, prevents OOM attacks)
+- `LLMConfig.TimeoutSeconds` - HTTP request timeout for content safety (default: 30s)
+- `AgentConfig.TimeoutSeconds` - Analysis timeout for semantic detection (default: 60s)
 
 <!-- END AUTO-MANAGED -->
 

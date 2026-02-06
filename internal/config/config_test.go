@@ -337,3 +337,110 @@ func TestLoadFromPath_EmptyPath(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "config path cannot be empty")
 }
+
+// --- Tests for #20: MaxInputSize config field ---
+
+func TestDefaultConfig_MaxInputSize(t *testing.T) {
+	cfg := DefaultConfig()
+	assert.Equal(t, int64(10*1024*1024), cfg.MaxInputSize, "default max input size should be 10MB")
+}
+
+func TestConfig_MaxInputSize_FromYAML(t *testing.T) {
+	tmpDir := t.TempDir()
+	configContent := `
+max_input_size: 5242880
+`
+	configPath := filepath.Join(tmpDir, ".open-guard.yaml")
+	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	require.NoError(t, err)
+
+	cfg, err := Load(tmpDir)
+	require.NoError(t, err)
+	assert.Equal(t, int64(5*1024*1024), cfg.MaxInputSize)
+}
+
+func TestConfig_MaxInputSize_MergePreservesExplicit(t *testing.T) {
+	homeDir := t.TempDir()
+	projectDir := t.TempDir()
+
+	globalDir := filepath.Join(homeDir, ".open-guard")
+	err := os.MkdirAll(globalDir, 0755)
+	require.NoError(t, err)
+
+	// Global config sets max_input_size
+	globalConfig := `
+max_input_size: 1048576
+`
+	err = os.WriteFile(filepath.Join(globalDir, "config.yaml"), []byte(globalConfig), 0644)
+	require.NoError(t, err)
+
+	// Project config does NOT set max_input_size - should preserve global value
+	projectConfig := `
+mode: strict
+`
+	err = os.WriteFile(filepath.Join(projectDir, ".open-guard.yaml"), []byte(projectConfig), 0644)
+	require.NoError(t, err)
+
+	cfg, err := LoadWithHome(projectDir, homeDir)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1048576), cfg.MaxInputSize, "global max_input_size should be preserved")
+	assert.Equal(t, ModeStrict, cfg.Mode, "project mode should override")
+}
+
+// --- Tests for #21: TimeoutSeconds config fields ---
+
+func TestDefaultConfig_TimeoutDefaults(t *testing.T) {
+	cfg := DefaultConfig()
+	assert.Equal(t, 60, cfg.Agent.TimeoutSeconds, "default agent timeout should be 60s")
+	assert.Equal(t, 30, cfg.LLM.TimeoutSeconds, "default LLM timeout should be 30s")
+}
+
+func TestConfig_TimeoutSeconds_FromYAML(t *testing.T) {
+	tmpDir := t.TempDir()
+	configContent := `
+agent:
+  enabled: true
+  timeout_seconds: 120
+llm:
+  enabled: true
+  timeout_seconds: 45
+`
+	configPath := filepath.Join(tmpDir, ".open-guard.yaml")
+	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	require.NoError(t, err)
+
+	cfg, err := Load(tmpDir)
+	require.NoError(t, err)
+	assert.Equal(t, 120, cfg.Agent.TimeoutSeconds)
+	assert.Equal(t, 45, cfg.LLM.TimeoutSeconds)
+}
+
+func TestConfig_TimeoutSeconds_MergePreservesExplicit(t *testing.T) {
+	homeDir := t.TempDir()
+	projectDir := t.TempDir()
+
+	globalDir := filepath.Join(homeDir, ".open-guard")
+	err := os.MkdirAll(globalDir, 0755)
+	require.NoError(t, err)
+
+	// Global config sets agent timeout
+	globalConfig := `
+agent:
+  timeout_seconds: 90
+`
+	err = os.WriteFile(filepath.Join(globalDir, "config.yaml"), []byte(globalConfig), 0644)
+	require.NoError(t, err)
+
+	// Project config sets agent enabled but not timeout - should preserve global
+	projectConfig := `
+agent:
+  enabled: true
+`
+	err = os.WriteFile(filepath.Join(projectDir, ".open-guard.yaml"), []byte(projectConfig), 0644)
+	require.NoError(t, err)
+
+	cfg, err := LoadWithHome(projectDir, homeDir)
+	require.NoError(t, err)
+	assert.Equal(t, 90, cfg.Agent.TimeoutSeconds, "global timeout should be preserved")
+	assert.True(t, cfg.Agent.Enabled, "project enabled should override")
+}

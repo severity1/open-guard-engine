@@ -77,12 +77,20 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 ```
 
 **Data Flow:**
-1. CLI receives raw text via stdin (optional --config flag for explicit config path)
-2. Encoding detector decodes obfuscated content (base64, hex, etc.)
-3. Pattern matcher checks against 93 compiled regex patterns
-4. If no match and agent enabled, Claude analyzes for semantic injection
-5. If safe and LLM enabled, llama-guard3 classifies content safety
-6. Response handler builds JSON output based on mode (strict/confirm/permissive)
+1. CLI reads stdin with hardcoded 10MB limit (prevents OOM before config loads)
+2. Config loaded via --config flag or auto-discovery (project > global > defaults)
+3. Input size validated against config's MaxInputSize (may be stricter than hardcoded limit)
+4. Encoding detector decodes obfuscated content (base64, hex, etc.)
+5. Pattern matcher checks against 93 compiled regex patterns
+6. If no match and agent enabled, Claude analyzes with timeout and context cancellation
+7. If safe and LLM enabled, llama-guard3 classifies content safety
+8. Response handler builds JSON output based on mode (strict/confirm/permissive)
+
+**Resource Limits:**
+- Hardcoded 10MB stdin limit applied before config load
+- Configurable MaxInputSize (default: 10MB) for stricter per-environment limits
+- Agent analysis timeout (default: 60s) with context cancellation support
+- LLM request timeout (default: 30s) for content safety checks
 
 <!-- END AUTO-MANAGED -->
 
@@ -105,6 +113,13 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 - Wrap errors with context: `fmt.Errorf("operation: %w", err)`
 - Early return on error, avoid deep nesting
 - Check error from deferred Close() only when it matters
+- Distinguish context cancellation: check `ctx.Err()` separately from operation errors
+
+**Context & Timeout Handling:**
+- Use `context.WithTimeout()` for operations with configurable timeouts
+- Check `ctx.Done()` in loops with `select` statements
+- Defer cancel functions immediately after context creation
+- Propagate context cancellation errors up the call stack
 
 **Imports:**
 - Group: stdlib, third-party, local packages
@@ -147,10 +162,12 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 - Security isolation for agent analysis to prevent malicious project configs
 - Three-layer detection with short-circuit evaluation for performance
 - Explicit config path support via --config flag for multi-environment setups
+- Critical path hardening against DoS attacks (input size limits, timeouts, context cancellation)
+- Two-stage input validation: hardcoded limit before config, then config limit
 
 **Commit Style:**
 - Conventional format: `type: description (#issue)`
-- Types: `fix`, `feat`, `docs`, `security`, `refactor`
+- Types: `fix`, `feat`, `docs`, `security`, `refactor`, `test`
 
 <!-- END AUTO-MANAGED -->
 

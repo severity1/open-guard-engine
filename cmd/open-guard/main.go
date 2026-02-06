@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/severity1/open-guard-engine/internal/agent"
 	"github.com/severity1/open-guard-engine/internal/config"
@@ -18,6 +19,11 @@ import (
 	"github.com/severity1/open-guard-engine/internal/types"
 	"github.com/spf13/cobra"
 )
+
+// defaultMaxInputSize is the hardcoded safety limit applied before config is loaded.
+// Config's MaxInputSize can override this once loaded, but this prevents unbounded
+// reads during the initial stdin consumption.
+const defaultMaxInputSize int64 = 10 * 1024 * 1024 // 10MB
 
 // Version information (set via ldflags)
 var (
@@ -131,10 +137,15 @@ Examples:
 
 Output is JSON with decision (allow/block/confirm) and threat details.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Read raw input from stdin
-			input, err := io.ReadAll(cmd.InOrStdin())
+			// Read raw input from stdin with size limit to prevent OOM.
+			// Uses hardcoded default since config is loaded after stdin read.
+			limitedReader := io.LimitReader(cmd.InOrStdin(), defaultMaxInputSize+1)
+			input, err := io.ReadAll(limitedReader)
 			if err != nil {
 				return fmt.Errorf("reading input: %w", err)
+			}
+			if int64(len(input)) > defaultMaxInputSize {
+				return fmt.Errorf("input exceeds maximum size of %d bytes", defaultMaxInputSize)
 			}
 			content := strings.TrimSpace(string(input))
 
@@ -155,6 +166,11 @@ Output is JSON with decision (allow/block/confirm) and threat details.`,
 			}
 			if err != nil {
 				return fmt.Errorf("loading config: %w", err)
+			}
+
+			// Validate input size against config (may be stricter than hardcoded default)
+			if cfg.MaxInputSize > 0 && int64(len(input)) > cfg.MaxInputSize {
+				return fmt.Errorf("input exceeds maximum size of %d bytes", cfg.MaxInputSize)
 			}
 
 			// Create pattern matcher
@@ -219,7 +235,14 @@ Output is JSON with decision (allow/block/confirm) and threat details.`,
 					cfg.Agent.Endpoint,
 				)
 				if claudeAnalyzer.IsAvailable() {
-					result, err := claudeAnalyzer.Analyze(context.Background(), analysisContent)
+					agentTimeout := time.Duration(cfg.Agent.TimeoutSeconds) * time.Second
+					if agentTimeout == 0 {
+						agentTimeout = 60 * time.Second
+					}
+					agentCtx, agentCancel := context.WithTimeout(context.Background(), agentTimeout)
+					defer agentCancel()
+
+					result, err := claudeAnalyzer.Analyze(agentCtx, analysisContent)
 					if err == nil && !result.Safe {
 						output := respHandler.BuildWithModeOverrideAndSource(
 							types.DecisionConfirm,
@@ -240,7 +263,14 @@ Output is JSON with decision (allow/block/confirm) and threat details.`,
 					cfg.LLM.ContentSafetyModel,
 				)
 				if contentAnalyzer.IsAvailable() {
-					result, err := contentAnalyzer.Analyze(context.Background(), analysisContent)
+					llmTimeout := time.Duration(cfg.LLM.TimeoutSeconds) * time.Second
+					if llmTimeout == 0 {
+						llmTimeout = 30 * time.Second
+					}
+					llmCtx, llmCancel := context.WithTimeout(context.Background(), llmTimeout)
+					defer llmCancel()
+
+					result, err := contentAnalyzer.Analyze(llmCtx, analysisContent)
 					if err == nil && !result.Safe {
 						category := mapCategory(result.Categories)
 						output := respHandler.BuildWithModeOverrideAndSource(

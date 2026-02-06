@@ -457,6 +457,86 @@ llm:
 	assert.Contains(t, output, "Content Safety Model: llama-guard3:1b")
 }
 
+// --- Tests for #20: Input size limit ---
+
+func TestAnalyzeCommand_InputUnderLimit(t *testing.T) {
+	// Input well under default 10MB limit should process normally
+	input := strings.Repeat("a", 1000)
+
+	cmd := newRootCmd()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetIn(strings.NewReader(input))
+	cmd.SetArgs([]string{"analyze"})
+
+	err := cmd.Execute()
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, `"decision":"allow"`)
+}
+
+func TestAnalyzeCommand_InputExceedsLimit(t *testing.T) {
+	// Create a config with a small max_input_size for testing
+	tmpDir := t.TempDir()
+	configContent := `
+max_input_size: 1024
+llm:
+  enabled: false
+`
+	err := os.WriteFile(filepath.Join(tmpDir, ".open-guard.yaml"), []byte(configContent), 0644)
+	require.NoError(t, err)
+
+	// Input exceeding the configured limit
+	input := strings.Repeat("x", 2048)
+
+	cmd := newRootCmd()
+	buf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(errBuf)
+	cmd.SetIn(strings.NewReader(input))
+	cmd.SetArgs([]string{"analyze", "--project", tmpDir})
+
+	err = cmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exceeds maximum size")
+}
+
+func TestDefaultMaxInputSize_Value(t *testing.T) {
+	// Verify the hardcoded default matches the expected 10MB value.
+	// This constant is used as a safety net before config is loaded.
+	assert.Equal(t, int64(10*1024*1024), defaultMaxInputSize,
+		"hardcoded default should be 10MB")
+}
+
+func TestAnalyzeCommand_InputAtExactLimit(t *testing.T) {
+	// Input at exactly the configured limit should process normally
+	tmpDir := t.TempDir()
+	configContent := `
+max_input_size: 1024
+llm:
+  enabled: false
+`
+	err := os.WriteFile(filepath.Join(tmpDir, ".open-guard.yaml"), []byte(configContent), 0644)
+	require.NoError(t, err)
+
+	// Exactly 1024 bytes (under limit by design: limit check is >)
+	input := strings.Repeat("a", 1024)
+
+	cmd := newRootCmd()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetIn(strings.NewReader(input))
+	cmd.SetArgs([]string{"analyze", "--project", tmpDir})
+
+	err = cmd.Execute()
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, `"decision"`)
+}
+
 func TestAnalyzeCommand_SpecialCharacters(t *testing.T) {
 	// Test with special characters that might cause parsing issues
 	inputs := []struct {
