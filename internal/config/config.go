@@ -24,37 +24,43 @@ type LLMConfig struct {
 	Enabled            bool   `yaml:"enabled"`
 	Endpoint           string `yaml:"endpoint"`             // http://localhost:11434
 	ContentSafetyModel string `yaml:"content_safety_model"` // llama-guard3:latest
+	TimeoutSeconds     int    `yaml:"timeout_seconds"`      // HTTP request timeout (default: 30)
 }
 
 // AgentConfig configures prompt injection detection (T5) using Claude Code as the agent harness.
 // Supports two providers: "claude" (Anthropic API) or "ollama" (local models).
 // Session is READ-ONLY - can read project files for context but cannot modify.
 type AgentConfig struct {
-	Enabled  bool   `yaml:"enabled"`
-	Provider string `yaml:"provider"` // "claude" (default) or "ollama"
-	Model    string `yaml:"model"`    // Model name (e.g., claude-sonnet-4-20250514 or llama3:latest)
-	Endpoint string `yaml:"endpoint"` // Ollama endpoint (only for ollama provider)
+	Enabled        bool   `yaml:"enabled"`
+	Provider       string `yaml:"provider"`        // "claude" (default) or "ollama"
+	Model          string `yaml:"model"`            // Model name (e.g., claude-sonnet-4-20250514 or llama3:latest)
+	Endpoint       string `yaml:"endpoint"`         // Ollama endpoint (only for ollama provider)
+	TimeoutSeconds int    `yaml:"timeout_seconds"`  // Analysis timeout (default: 60)
 }
 
 // Config holds the open-guard configuration.
 type Config struct {
-	Mode      Mode        `yaml:"mode"`
-	MLEnabled bool        `yaml:"ml_enabled"` // Deprecated: use LLM.Enabled instead
-	LLM       LLMConfig   `yaml:"llm"`
-	Agent     AgentConfig `yaml:"agent"`
+	Mode         Mode        `yaml:"mode"`
+	MaxInputSize int64       `yaml:"max_input_size"` // Max stdin bytes (default: 10MB)
+	MLEnabled    bool        `yaml:"ml_enabled"`     // Deprecated: use LLM.Enabled instead
+	LLM          LLMConfig   `yaml:"llm"`
+	Agent        AgentConfig `yaml:"agent"`
 }
 
 // DefaultConfig returns a Config with sensible defaults.
 func DefaultConfig() *Config {
 	return &Config{
-		Mode:      ModeConfirm,
-		MLEnabled: true, // Deprecated but kept for backwards compatibility
+		Mode:         ModeConfirm,
+		MaxInputSize: 10 * 1024 * 1024, // 10MB
+		MLEnabled:    true,             // Deprecated but kept for backwards compatibility
 		LLM: LLMConfig{
-			Enabled:  true,
-			Endpoint: "http://localhost:11434",
+			Enabled:        true,
+			Endpoint:       "http://localhost:11434",
+			TimeoutSeconds: 30,
 		},
 		Agent: AgentConfig{
-			Enabled: false,
+			Enabled:        false,
+			TimeoutSeconds: 60,
 		},
 	}
 }
@@ -193,6 +199,9 @@ func mergeConfigData(cfg *Config, data []byte, path string) error {
 	if fileCfg.Mode != "" {
 		cfg.Mode = fileCfg.Mode
 	}
+	if _, ok := rawCfg["max_input_size"]; ok {
+		cfg.MaxInputSize = fileCfg.MaxInputSize
+	}
 
 	// Handle deprecated ml_enabled for backwards compatibility
 	if _, ok := rawCfg["ml_enabled"]; ok {
@@ -215,6 +224,9 @@ func mergeConfigData(cfg *Config, data []byte, path string) error {
 			if fileCfg.LLM.ContentSafetyModel != "" {
 				cfg.LLM.ContentSafetyModel = fileCfg.LLM.ContentSafetyModel
 			}
+			if _, ok := llmMap["timeout_seconds"]; ok {
+				cfg.LLM.TimeoutSeconds = fileCfg.LLM.TimeoutSeconds
+			}
 		}
 	}
 
@@ -232,6 +244,9 @@ func mergeConfigData(cfg *Config, data []byte, path string) error {
 			}
 			if fileCfg.Agent.Endpoint != "" {
 				cfg.Agent.Endpoint = fileCfg.Agent.Endpoint
+			}
+			if _, ok := agentMap["timeout_seconds"]; ok {
+				cfg.Agent.TimeoutSeconds = fileCfg.Agent.TimeoutSeconds
 			}
 		}
 	}

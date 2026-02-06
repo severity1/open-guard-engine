@@ -124,11 +124,21 @@ func (a *ClaudeAnalyzer) Analyze(ctx context.Context, content string) (*Result, 
 	// Collect the response
 	var response strings.Builder
 	for {
+		// Check for context cancellation before each iteration
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
 		msg, err := iterator.Next(ctx)
 		if errors.Is(err, claudecode.ErrNoMoreMessages) {
 			break
 		}
 		if err != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
 			return nil, fmt.Errorf("reading response: %w", err)
 		}
 
