@@ -38,5 +38,9 @@ dist/
 *.local.yaml
 .open-guard.yaml
 
+# Demo intermediates
+demo/*.webm
+demo/concat.txt
+
 # Claude Code auto-memory
 .claude/auto-memory/dirty-files

@@ -1,4 +1,4 @@
-.PHONY: build build-all test test-coverage test-integration test-integration-all lint clean install bench
+.PHONY: build build-all test test-coverage test-integration test-integration-all lint clean install bench demo demo-clean
 
 # Build variables
 BINARY_NAME := open-guard
@@ -44,7 +44,7 @@ bench:
 # Run integration tests (pattern-only, no external deps)
 test-integration:
 	@echo "Running pattern-only integration tests..."
-	go test -v ./tests/integration/... -run 'TestPatternMode|TestStrictMode|TestPermissiveMode|TestConfirmMode|TestDetectedBy_Pattern'
+	go test -v ./tests/integration/... -run '/pattern-only'
 
 # Run all integration tests (requires Ollama + Claude)
 test-integration-all:
@@ -65,6 +65,29 @@ clean:
 # Install to GOPATH/bin
 install:
 	go install $(LDFLAGS) ./$(CMD_DIR)
+
+# Kill orphaned VHS processes (go-rod headless Chrome) and remove intermediate files
+demo-clean:
+	@rm -f demo/part1.webm demo/part2.webm demo/part3.webm demo/full.webm demo/concat.txt
+	@-pkill -f 'leakless.*chrome' 2>/dev/null || true
+	@-pkill -f 'chrome.*--headless.*--no-first-run' 2>/dev/null || true
+
+# Generate demo GIF (three tapes -> webm -> concat -> GIF)
+# Uses a shell trap to clean up intermediate files and orphaned VHS processes on failure
+demo: build
+	@trap 'rm -f demo/part1.webm demo/part2.webm demo/part3.webm demo/full.webm demo/concat.txt; pkill -f "[l]eakless.*chrome" 2>/dev/null; true' EXIT; \
+	echo "Recording part 1 (title + patterns)..." && \
+	vhs demo/part1.tape && \
+	echo "Recording part 2 (agent detection)..." && \
+	vhs demo/part2.tape && \
+	echo "Recording part 3 (LLM safety)..." && \
+	vhs demo/part3.tape && \
+	echo "Concatenating recordings..." && \
+	printf "file 'part1.webm'\nfile 'part2.webm'\nfile 'part3.webm'\n" > demo/concat.txt && \
+	cd demo && ffmpeg -y -f concat -safe 0 -i concat.txt -c copy full.webm && cd .. && \
+	echo "Converting to GIF..." && \
+	ffmpeg -y -i demo/full.webm -vf "fps=15,split[s0][s1];[s0]palettegen=max_colors=128[p];[s1][p]paletteuse=dither=bayer" demo.gif && \
+	echo "Generated demo.gif ($$(du -h demo.gif | cut -f1))"
 
 # Download dependencies
 deps:

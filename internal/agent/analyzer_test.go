@@ -20,7 +20,7 @@ func TestParseClaudeResponse(t *testing.T) {
 		{"safe response", "SAFE", true, false},
 		{"safe with explanation", "SAFE - This is a normal coding request", true, false},
 		{"injection detected", "INJECTION: Attempts to override system instructions", false, false},
-		{"injection simple", "INJECTION", false, false},
+		{"injection simple", "INJECTION", false, false}, // now returns default reason
 		{"lowercase safe", "safe", true, false},
 		{"lowercase injection", "injection: bypass", false, false},
 		{"safe with whitespace", "  SAFE  ", true, false},
@@ -204,12 +204,12 @@ func TestParseClaudeResponse_Comprehensive(t *testing.T) {
 		{"SAFE with trailing text", "SAFE: benign coding request", true, "", false},
 
 		// Injection responses
-		{"INJECTION uppercase", "INJECTION", false, "", false},
-		{"injection lowercase", "injection", false, "", false},
+		{"INJECTION uppercase", "INJECTION", false, "detected by semantic analysis", false},
+		{"injection lowercase", "injection", false, "detected by semantic analysis", false},
 		{"INJECTION with colon reason", "INJECTION: Attempts to override instructions", false, "ATTEMPTS TO OVERRIDE INSTRUCTIONS", false},
-		{"INJECTION with whitespace", "  INJECTION  ", false, "", false},
+		{"INJECTION with whitespace", "  INJECTION  ", false, "detected by semantic analysis", false},
 		{"injection with reason", "injection: bypass security", false, "BYPASS SECURITY", false},
-		{"INJECTION multiline", "INJECTION\nWith extra details", false, "", false},
+		{"INJECTION multiline", "INJECTION\nWith extra details", false, "WITH EXTRA DETAILS", false},
 		{"INJECTION double colon", "INJECTION::reason", false, "REASON", false},
 
 		// Error cases
@@ -232,9 +232,7 @@ func TestParseClaudeResponse_Comprehensive(t *testing.T) {
 
 			if !tt.wantSafe {
 				assert.Contains(t, result.Categories, "T5", "Should have T5 category for injections")
-				if tt.wantReason != "" {
-					assert.Equal(t, tt.wantReason, result.Reason)
-				}
+				assert.Equal(t, tt.wantReason, result.Reason)
 			}
 		})
 	}
@@ -337,12 +335,12 @@ func TestInjectionAnalysisPrompt_Structure(t *testing.T) {
 	assert.Contains(t, prompt, "SAFE")
 	assert.Contains(t, prompt, "INJECTION")
 	assert.Contains(t, prompt, content)
-	assert.Contains(t, prompt, "DIRECT:")
-	assert.Contains(t, prompt, "JAILBREAK:")
-	assert.Contains(t, prompt, "SOCIAL:")
-	assert.Contains(t, prompt, "ENCODING:")
+	assert.Contains(t, prompt, "CLASSIFY AS INJECTION")
+	assert.Contains(t, prompt, "CLASSIFY AS SAFE")
+	assert.Contains(t, prompt, "DECISION THRESHOLD")
 	assert.Contains(t, prompt, "BEGIN_UNTRUSTED")
 	assert.Contains(t, prompt, "END_UNTRUSTED")
+	assert.Contains(t, prompt, "brief reason")
 }
 
 // --- Tests for #14: Context cancellation in iterator loop ---

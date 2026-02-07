@@ -244,12 +244,16 @@ Output is JSON with decision (allow/block/confirm) and threat details.`,
 
 					result, err := claudeAnalyzer.Analyze(agentCtx, analysisContent)
 					if err == nil && !result.Safe {
+						reason := result.Reason
+						if reason == "" {
+							reason = "detected by semantic analysis"
+						}
 						output := respHandler.BuildWithModeOverrideAndSource(
 							types.DecisionConfirm,
 							types.ThreatLevelHigh,
 							types.ThreatCategoryPromptInjection,
 							types.DetectionSourceAgent,
-							fmt.Sprintf("Potential injection: %s", result.Reason),
+							fmt.Sprintf("Potential injection: %s", reason),
 						)
 						return outputJSON(cmd, output)
 					}
