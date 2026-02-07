@@ -29,10 +29,10 @@ func TestInjectionDetection(t *testing.T) {
 						if output.Decision != types.DecisionAllow {
 							detected++
 							// Verify threat type for detected injections
-							// Pattern matching always returns T5, but LLM/agent may use different categories
+							// Pattern matching returns the category of the matched pattern (T5, T8, etc.)
 							if output.DetectedBy == types.DetectionSourcePattern {
-								assert.Equal(t, types.ThreatCategoryPromptInjection, output.ThreatType,
-									"Pattern-detected injection should be categorized as T5")
+								assert.NotEmpty(t, output.ThreatType,
+									"Pattern-detected injection should have a threat type")
 							}
 							// LLM classifiers (llama-guard) may return S1-S14 categories
 							// Agent detectors may return T5 or other categories based on analysis

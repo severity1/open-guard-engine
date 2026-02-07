@@ -286,6 +286,7 @@ make test          # Run tests
 make test-coverage # Coverage report
 make lint          # Run linter
 make bench         # Run benchmarks
+make demo          # Regenerate demo.gif (requires vhs + ffmpeg)
 ```
 
 ## License

@@ -1,7 +1,7 @@
 ---
 argument-hint: [pr-number] (optional, defaults to current branch)
 description: Comprehensive code review with parallel specialized reviewers for security-focused analysis
-allowed-tools: Read, Grep, Glob, Bash(go test:*), Bash(make test:*), Bash(make lint:*), Bash(git diff:*), Bash(gh pr:*), Task
+allowed-tools: Read, Grep, Glob, Bash(go test:*), Bash(make test:*), Bash(make lint:*), Bash(git diff:*), Bash(gh pr:*), Bash(gh issue:*), Task
 ---
 
 # TDD Code Review
@@ -43,6 +43,19 @@ List all files that will be reviewed. Group by category:
 - `tests/` - Test files
 - Other
 
+**Cross-Reference Open GitHub Issues:**
+```bash
+gh issue list --state open --limit 50 --json number,title,labels,body
+```
+
+Filter the fetched issues to only those relevant to the changes. An issue is relevant if:
+- It mentions a changed file, package, or function by name
+- It describes a bug or gap in functionality touched by the diff
+- It references a threat category (T1-T9, S1-S13) affected by the changes
+- Its labels correspond to changed areas (e.g. `agent`, `patterns`, `encoding`)
+
+Discard all other issues. Produce a short list of relevant issues (number, title, one-line summary of relevance) to pass to reviewers. If no issues are relevant, note "No related open issues" and skip issue context in reviewer prompts.
+
 ---
 
 ## Phase 2: Parallel Specialized Review
@@ -67,6 +80,10 @@ Changed files:
 
 Diff content:
 <include the diff from Phase 1>
+
+Related open issues:
+<include relevant issues from Phase 1, or "None" if no issues relate to these changes>
+Flag if any issue describes a vulnerability or gap that these changes fail to address.
 ```
 
 The paranoid-sentinel will provide:
@@ -98,10 +115,11 @@ The paranoid-sentinel will provide:
 - Edge cases and boundary conditions
 - Mock usage appropriate
 - Integration test coverage if applicable
+- Open issues requesting test improvements or reporting test gaps
 
 **Severity:** Missing tests for security code is Major.
 
-### Reviewer 4: Architecture Review
+### Reviewer 4: Architecture & Issue Review
 
 **Focus Areas:**
 - Package boundaries respected
@@ -109,19 +127,23 @@ The paranoid-sentinel will provide:
 - YAGNI violations (over-engineering)
 - Detection pipeline integration correct
 - Configuration handling appropriate
+- Open GitHub issues related to changed files or functionality
+- Whether changes partially address, fully resolve, or conflict with open issues
 
-**Severity:** Usually Minor unless breaking architecture.
+**Severity:** Usually Minor unless breaking architecture. Unaddressed issues in changed areas are Major.
 
 ### Launching Reviewers
 
 Use the Task tool to launch reviewers in parallel:
 
 ```
-Task(subagent_type="paranoid-sentinel", prompt="Review these changes for security: <diff>")
+Task(subagent_type="paranoid-sentinel", prompt="Review these changes for security: <diff> Related issues: <issues>")
 Task(subagent_type="general-purpose", prompt="Review Go standards: <diff>")
-Task(subagent_type="general-purpose", prompt="Review test coverage: <diff>")
-Task(subagent_type="general-purpose", prompt="Review architecture: <diff>")
+Task(subagent_type="general-purpose", prompt="Review test coverage: <diff> Related issues: <issues>")
+Task(subagent_type="general-purpose", prompt="Review architecture and issue coverage: <diff> Open issues: <issues>")
 ```
+
+Include relevant open GitHub issues (from Phase 1) in prompts for reviewers 1, 3, and 4. Reviewer 2 (Go standards) does not need issue context.
 
 Wait for all reviewers to complete before proceeding to Phase 3.
 
@@ -153,9 +175,18 @@ Consolidate findings from all reviewers into a structured report.
 ### Minor Issues
 - [ ] Issue 1: [file:line] Description
 
+### Issue Cross-Reference
+- [ ] #N: Issue title - status (addressed/partially addressed/not addressed/conflicts)
+
 ### Positive Observations
 - Good: Description of well-done aspects
 ```
+
+When cross-referencing issues:
+- **Addressed**: Changes fully resolve the issue - note this in the report
+- **Partially addressed**: Changes touch related code but don't fully resolve - flag remaining work
+- **Not addressed**: Open issue affects changed files but isn't handled - flag as Major if security-related
+- **Conflicts**: Changes may regress or conflict with an open issue - flag as Critical
 
 ---
 
