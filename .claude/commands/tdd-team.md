@@ -14,6 +14,10 @@ You are the **lead** for an autonomous TDD team. You design the task graph, spaw
 
 Validate the environment before doing anything else.
 
+**Input check:** If `$ARGUMENTS` is empty, stop immediately and ask the user:
+"No issue numbers provided. Usage: /tdd-team <issue-numbers> (e.g., /tdd-team 42 or /tdd-team 42 43)"
+Do NOT proceed to any further steps.
+
 ```bash
 git status
 make build
@@ -80,16 +84,22 @@ Task 5: QA GREEN phase [blocked by: 4]
   - make lint: PASS
   - make test-integration: PASS
 
+Task 6: Review gate [blocked by: 5]
+  Description: Placeholder that blocks BLUE until all reviews pass.
+  Lead completes this task ONLY after all review subagents return APPROVED
+  (or after the review loop resolves all ISSUES FOUND).
+  DO NOT claim this task - lead manages it directly.
+
 --- Review tasks NOT created upfront (lead creates just-in-time, see Review Dispatch) ---
 
-Task 6: BLUE - refactor [blocked by: 5, plus review gates added by lead]
+Task 7: BLUE - refactor [blocked by: 6]
   Files: internal/<pkg>/*.go (only if review feedback requires changes)
   Success: Review issues resolved, no behavior changes, all tests pass
 
-Task 7: QA BLUE phase [blocked by: 6]
+Task 8: QA BLUE phase [blocked by: 7]
   Success criteria: same as QA GREEN (Task 5)
 
-Task 8: Create PR [blocked by: 7]
+Task 9: Create PR [blocked by: 8]
   Success: PR created with summary, test plan, review verdicts
 ```
 
@@ -105,14 +115,18 @@ Task 5: QA RED #X [blocked: 3]        Task 6: QA RED #Y [blocked: 4]
 Task 7: GREEN #X [blocked: 5]         Task 8: GREEN #Y [blocked: 6]
 Task 9: QA GREEN #X [blocked: 7]      Task 10: QA GREEN #Y [blocked: 8]
 
-Cross-dependency (if files overlap):
-Task 8 also blocked by Task 7 -- prevents collision
+Cross-dependency -- ONLY add if tracks share files (check during planning):
+  If files overlap: Task 8 also blocked by Task 7 -- prevents collision
+  If no overlap: tracks remain fully independent (no cross-dependency)
+
+Task 11: Review gate [blocked: 9, 10]
+  Lead completes ONLY after all review subagents return APPROVED.
 
 --- Review tasks NOT created upfront (lead creates just-in-time, see Review Dispatch) ---
 
-Task 11: BLUE refactor [blocked: 9, 10, plus review gates added by lead]
-Task 12: QA BLUE [blocked: 11]
-Task 13: Create PR [blocked: 12]
+Task 12: BLUE refactor [blocked: 11]
+Task 13: QA BLUE [blocked: 12]
+Task 14: Create PR [blocked: 13]
 ```
 
 ### Team Sizing
@@ -157,9 +171,15 @@ Create the team and task list:
 TeamCreate(team_name="tdd-$SAFE_ARGS", description="TDD team for issue(s) #$ARGUMENTS")
 ```
 
-Then create tasks from the task graph using `TaskCreate`, setting dependencies with `TaskUpdate(addBlockedBy=...)`. Do NOT create review tasks upfront - the lead creates those just-in-time when dispatching review subagents (see Review Dispatch).
+Then create tasks from the task graph using `TaskCreate`, setting dependencies with `TaskUpdate(addBlockedBy=...)`. Create the "Review gate" task upfront (it blocks BLUE from the start). Do NOT create review sub-tasks upfront - the lead creates those just-in-time when dispatching review subagents (see Review Dispatch).
 
 Then spawn teammates. Do NOT use `mode: "plan"` for any teammate.
+
+When constructing teammate prompts, substitute these variables with actual values:
+- `$LEAD_NAME` - the lead's own agent name (from the team config after TeamCreate)
+- `$VERIFIER_NAME` - the verifier's name (typically "verifier")
+- `$IMPLEMENTER_NAMES` - comma-separated list of all implementer names
+- `$OTHER_IMPLEMENTERS` - other implementer names besides the one being spawned (empty if solo)
 
 ### Implementer Prompt Template
 
@@ -178,11 +198,12 @@ Task(
 You are a TDD implementer for the open-guard-engine project (issue(s) #$ARGUMENTS).
 
 ## Team Members
-To find all teammate names: read ~/.claude/teams/tdd-<issue>/config.json (contains members array with name, agentId, agentType for each member).
+The lead injects actual teammate names at spawn time. Use these exact names with SendMessage:
+- Lead: "$LEAD_NAME"
+- Verifier: "$VERIFIER_NAME"
+- Other implementers: $OTHER_IMPLEMENTERS (if any)
 
-Known teammates (use exact names with SendMessage):
-- Verifier: "verifier" - handles QA tasks
-- Lead: read the team config to find the lead's name for the `recipient` field
+Fallback: read ~/.claude/teams/tdd-$SAFE_ARGS/config.json for the full members array.
 
 When messaging teammates, always use their exact name as the SendMessage recipient.
 
@@ -214,8 +235,11 @@ The lead will decide whether to create it.
 
 ## Tool Restrictions
 NEVER use: TeamCreate, TeamDelete, SendMessage(type="broadcast")
-NEVER modify tasks owned by other agents
+These tools will disrupt team coordination. Using them is a critical error.
+NEVER modify tasks owned by other agents.
 Only the lead manages the team and dispatches reviews.
+
+Note: These are prompt-enforced (no per-tool spawn restrictions exist). Compliance depends on following these instructions.
 
 Start by checking TaskList for available work.
 ```
@@ -237,11 +261,11 @@ Task(
 You are the QA verifier for the TDD team on issue(s) #$ARGUMENTS.
 
 ## Team Members
-To find all teammate names: read ~/.claude/teams/tdd-<issue>/config.json (contains members array with name, agentId, agentType for each member).
+The lead injects actual teammate names at spawn time. Use these exact names with SendMessage:
+- Lead: "$LEAD_NAME"
+- Implementers: $IMPLEMENTER_NAMES
 
-Known teammates (use exact names with SendMessage):
-- Implementer: "implementer-1" (default name for single-implementer teams)
-- Lead: read the team config to find the lead's name for the `recipient` field
+Fallback: read ~/.claude/teams/tdd-$SAFE_ARGS/config.json for the full members array.
 
 When messaging teammates, always use their exact name as the SendMessage recipient.
 
@@ -290,9 +314,13 @@ Results:
 [Exact error output for each failing target]
 
 ## Review Handoff
-When you complete a QA GREEN or QA BLUE task, message the lead:
-"QA [GREEN/BLUE] complete. Review tasks are ready for dispatch."
+When you complete a QA GREEN task, message the lead:
+"QA GREEN complete. Review tasks are ready for dispatch."
 This triggers the lead to dispatch review subagents.
+
+QA BLUE does NOT trigger review dispatch. BLUE is refactoring only (no behavior changes)
+and the code was already reviewed after GREEN. After QA BLUE passes, the pipeline proceeds
+directly to PR creation.
 
 ## Dynamic Task Proposals
 If you discover work that needs doing (e.g., pre-existing lint failures on untouched lines),
@@ -301,8 +329,11 @@ TASK PROPOSAL: <what> | WHY: <reason> | BLOCKS: <what it gates> | FILES: <affect
 
 ## Tool Restrictions
 NEVER use: TeamCreate, TeamDelete, SendMessage(type="broadcast")
-NEVER modify tasks owned by other agents
+These tools will disrupt team coordination. Using them is a critical error.
+NEVER modify tasks owned by other agents.
 Only the lead manages the team and dispatches reviews.
+
+Note: These are prompt-enforced (no per-tool spawn restrictions exist). Compliance depends on following these instructions.
 
 Start by checking TaskList for available work.
 ```
@@ -319,17 +350,21 @@ After spawning teammates, the lead does not do implementation work unless a team
 2. When an implementer completes RED tests, QA task auto-unblocks - verifier claims it
 3. When verifier completes QA, next implementation task auto-unblocks
 4. When verifier messages that QA GREEN is complete, lead creates review tasks and dispatches review subagents (see Review Dispatch)
-5. Each review subagent's verdict gets recorded on its task, which then unblocks BLUE phase
+5. Each review subagent's verdict gets recorded on its task. When all reviews pass, lead completes the "Review gate" task, which unblocks BLUE
 
 ### Review Dispatch (lead-driven, just-in-time)
 
-When the verifier messages that QA GREEN (or QA BLUE) is complete, the lead:
+When the verifier messages that QA GREEN is complete, the lead:
 1. Creates 4 review tasks via TaskCreate (security, standards, testing, architecture)
-2. Adds each as a blocker on the BLUE refactor task via TaskUpdate(addBlockedBy=...)
-3. Dispatches 4 review subagents in parallel (single message, 4 Task tool calls)
-4. Marks each review task complete with the subagent's verdict
+2. Dispatches 4 review subagents in parallel (single message, 4 Task tool calls)
+3. Marks each review task complete with the subagent's verdict
+4. When ALL reviews are APPROVED (or after the review loop resolves all issues),
+   marks the "Review gate" task as completed - this unblocks BLUE
 
-This just-in-time creation prevents teammates from self-claiming review tasks before subagents are dispatched.
+Review sub-tasks are informational (not direct blockers on BLUE). The upfront "Review gate"
+task is the sole gate between QA GREEN and BLUE. The lead controls it directly.
+
+This just-in-time creation of review sub-tasks prevents teammates from self-claiming review tasks before subagents are dispatched.
 
 ```
 Task(subagent_type="paranoid-sentinel", prompt="Security review for issue(s) #$ARGUMENTS.
@@ -417,13 +452,14 @@ while QA task not passing:
 while any review has ISSUES FOUND:
   1. Lead dispatches review subagents in parallel (4 on first pass)
   2. Collect all verdicts
-  3. If ALL APPROVED: mark review tasks complete -> BLUE phase unblocks
+  3. If ALL APPROVED: mark review tasks complete, then mark "Review gate" task as completed -> BLUE unblocks
   4. If ISSUES FOUND: consolidate feedback, message implementer
   5. Implementer fixes, commits
   6. Lead creates a new "QA Regression Check" task, assigns to verifier
-  7. Verifier runs full QA criteria on the new task
-  8. If QA passes: lead re-dispatches ONLY the previously-failing reviewers as new subagent calls
-  9. If review iteration >= 3: escalate to user
+  7. Lead messages the verifier about the new task (idle agents only wake on message)
+  8. Verifier runs full QA criteria on the new task
+  9. If QA passes: lead re-dispatches ONLY the previously-failing reviewers as new subagent calls
+  10. If review iteration >= 3: escalate to user
 ```
 
 ### Dynamic Task Creation (proposal + lead decision)
@@ -531,11 +567,11 @@ EOF
 
 Shut down all teammates, wait for confirmations, then delete the team:
 
-1. Send shutdown requests:
+1. Send shutdown requests to all teammates (use the actual names from spawn time):
    ```
-   SendMessage(type="shutdown_request", recipient="implementer-1", content="PR created, shutting down")
-   SendMessage(type="shutdown_request", recipient="verifier", content="PR created, shutting down")
-   # (repeat for any additional implementers)
+   SendMessage(type="shutdown_request", recipient="<implementer-name>", content="PR created, shutting down")
+   SendMessage(type="shutdown_request", recipient="<verifier-name>", content="PR created, shutting down")
+   # (repeat for each teammate - use actual names, not placeholders)
    ```
 
 2. Wait for all shutdown confirmations (delivered automatically via messages).
