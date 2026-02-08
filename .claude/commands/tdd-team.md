@@ -57,49 +57,43 @@ Every task description MUST include:
 #### Single Issue (1 package)
 
 ```
-Task 1: Explore codebase for issue #N
-  Description: Read issue details, find related files, understand patterns.
-  Files: N/A (read-only exploration)
-  Success: Plan documented with files to modify, test cases, security considerations
-
-Task 2: RED - write failing tests [blocked by: 1]
+Task 1: RED - write failing tests
   Files: internal/<pkg>/*_test.go
   Success: New tests compile but FAIL when run
 
-Task 3: QA RED phase [blocked by: 2]
+Task 2: QA RED phase [blocked by: 1]
   Success criteria:
   - make build: PASS
   - make lint: PASS
   - go test -v ./internal/<pkg>/... -run <NewTests>: FAIL (expected)
   - make test-integration: PASS (no regressions)
 
-Task 4: GREEN - implement [blocked by: 3]
+Task 3: GREEN - implement [blocked by: 2]
   Files: internal/<pkg>/*.go (non-test files)
   Success: All tests pass with minimal implementation
 
-Task 5: QA GREEN phase [blocked by: 4]
+Task 4: QA GREEN phase [blocked by: 3]
   Success criteria:
   - make build: PASS
   - make test: PASS (all tests including new)
   - make lint: PASS
   - make test-integration: PASS
 
-Task 6: Review gate [blocked by: 5]
+Task 5: Review gate [blocked by: 4] (owner: lead)
   Description: Placeholder that blocks BLUE until all reviews pass.
   Lead completes this task ONLY after all review subagents return APPROVED
   (or after the review loop resolves all ISSUES FOUND).
-  DO NOT claim this task - lead manages it directly.
 
 --- Review tasks NOT created upfront (lead creates just-in-time, see Review Dispatch) ---
 
-Task 7: BLUE - refactor [blocked by: 6]
+Task 6: BLUE - refactor [blocked by: 5]
   Files: internal/<pkg>/*.go (only if review feedback requires changes)
   Success: Review issues resolved, no behavior changes, all tests pass
 
-Task 8: QA BLUE phase [blocked by: 7]
-  Success criteria: same as QA GREEN (Task 5)
+Task 7: QA BLUE phase [blocked by: 6]
+  Success criteria: same as QA GREEN (Task 4)
 
-Task 9: Create PR [blocked by: 8]
+Task 8: Create PR [blocked by: 7] (owner: lead)
   Success: PR created with summary, test plan, review verdicts
 ```
 
@@ -109,24 +103,23 @@ Create parallel tracks with cross-dependencies where files overlap:
 
 ```
 Track A (issue #X):                    Track B (issue #Y):
-Task 1: Explore for #X                Task 2: Explore for #Y
-Task 3: RED tests #X [blocked: 1]     Task 4: RED tests #Y [blocked: 2]
-Task 5: QA RED #X [blocked: 3]        Task 6: QA RED #Y [blocked: 4]
-Task 7: GREEN #X [blocked: 5]         Task 8: GREEN #Y [blocked: 6]
-Task 9: QA GREEN #X [blocked: 7]      Task 10: QA GREEN #Y [blocked: 8]
+Task 1: RED tests #X                   Task 2: RED tests #Y
+Task 3: QA RED #X [blocked: 1]        Task 4: QA RED #Y [blocked: 2]
+Task 5: GREEN #X [blocked: 3]         Task 6: GREEN #Y [blocked: 4]
+Task 7: QA GREEN #X [blocked: 5]      Task 8: QA GREEN #Y [blocked: 6]
 
 Cross-dependency -- ONLY add if tracks share files (check during planning):
-  If files overlap: Task 8 also blocked by Task 7 -- prevents collision
+  If files overlap: Task 6 also blocked by Task 5 -- prevents collision
   If no overlap: tracks remain fully independent (no cross-dependency)
 
-Task 11: Review gate [blocked: 9, 10]
+Task 9: Review gate [blocked: 7, 8] (owner: lead)
   Lead completes ONLY after all review subagents return APPROVED.
 
 --- Review tasks NOT created upfront (lead creates just-in-time, see Review Dispatch) ---
 
-Task 12: BLUE refactor [blocked: 11]
-Task 13: QA BLUE [blocked: 12]
-Task 14: Create PR [blocked: 13]
+Task 10: BLUE refactor [blocked: 9]
+Task 11: QA BLUE [blocked: 10]
+Task 12: Create PR [blocked: 11] (owner: lead)
 ```
 
 ### Team Sizing
@@ -171,7 +164,7 @@ Create the team and task list:
 TeamCreate(team_name="tdd-$SAFE_ARGS", description="TDD team for issue(s) #$ARGUMENTS")
 ```
 
-Then create tasks from the task graph using `TaskCreate`, setting dependencies with `TaskUpdate(addBlockedBy=...)`. Create the "Review gate" task upfront (it blocks BLUE from the start). Do NOT create review sub-tasks upfront - the lead creates those just-in-time when dispatching review subagents (see Review Dispatch).
+Then create tasks from the task graph using `TaskCreate`, setting dependencies with `TaskUpdate(addBlockedBy=...)`. Create the "Review gate" and "Create PR" tasks upfront with `owner` set to the lead's name (prevents teammates from claiming lead-managed tasks). Do NOT create review sub-tasks upfront - the lead creates those just-in-time when dispatching review subagents (see Review Dispatch).
 
 Then spawn teammates. Do NOT use `mode: "plan"` for any teammate.
 
@@ -207,11 +200,22 @@ Fallback: read ~/.claude/teams/tdd-$SAFE_ARGS/config.json for the full members a
 
 When messaging teammates, always use their exact name as the SendMessage recipient.
 
-## How You Work
-- Check TaskList for available work (unblocked, unassigned tasks)
-- Claim tasks by setting yourself as owner via TaskUpdate
-- After completing a task, mark it completed and check TaskList for next work
-- Prefer tasks in ID order when multiple are available
+## How You Work (Self-Coordination Loop)
+Your core behavior is a continuous work loop:
+1. Check TaskList for unblocked, unassigned tasks
+2. Claim the lowest-ID available task via TaskUpdate (set owner to your name)
+3. Work the task to completion
+4. Mark it completed via TaskUpdate
+5. Immediately check TaskList again (go to step 1)
+
+Exit conditions (only stop when ALL are true):
+- No unblocked, unassigned tasks remain in TaskList
+- You have no in-progress tasks
+- Message the lead: "No available work. Standing by."
+
+If all remaining tasks are blocked by others, message the lead with your status
+and which tasks you're waiting on, then stand by for the lead to message you
+with new work.
 
 ## TDD Discipline
 - RED phase: Write failing tests. Tests MUST fail. Commit with `test:` prefix.
@@ -220,7 +224,7 @@ When messaging teammates, always use their exact name as the SendMessage recipie
 - Fix iterations: Commit with `fix:` prefix.
 
 ## Project Context
-See CLAUDE.md for Go conventions, architecture, detection pipeline, and directory structure.
+CLAUDE.md loads automatically with Go conventions, architecture, and directory structure.
 
 ## Security Test Requirements (This is a Security Tool)
 - Positive cases: Detect the attack vector
@@ -269,10 +273,21 @@ Fallback: read ~/.claude/teams/tdd-$SAFE_ARGS/config.json for the full members a
 
 When messaging teammates, always use their exact name as the SendMessage recipient.
 
-## How You Work
-- Check TaskList for available QA tasks (unblocked, unassigned)
-- Claim QA tasks by setting yourself as owner via TaskUpdate
-- After completing a task, mark it completed and check TaskList for next work
+## How You Work (Self-Coordination Loop)
+Your core behavior is a continuous work loop:
+1. Check TaskList for unblocked, unassigned QA tasks
+2. Claim the lowest-ID available QA task via TaskUpdate (set owner to your name)
+3. Run the QA success criteria for that task
+4. If pass: mark completed, go to step 1
+5. If fail: message the implementer, wait for their fix message, re-run (QA Loop)
+
+Exit conditions (only stop when ALL are true):
+- No unblocked, unassigned QA tasks remain in TaskList
+- You have no in-progress tasks
+- Message the lead: "No available QA work. Standing by."
+
+If all remaining QA tasks are blocked, message the lead with your status
+and which tasks you're waiting on, then stand by.
 
 ## QA Success Criteria
 
@@ -316,7 +331,7 @@ Results:
 ## Review Handoff
 When you complete a QA GREEN task, message the lead:
 "QA GREEN complete. Review tasks are ready for dispatch."
-This triggers the lead to dispatch review subagents.
+This triggers the lead to dispatch review subagents (see Review Dispatch in Phase 4).
 
 QA BLUE does NOT trigger review dispatch. BLUE is refactoring only (no behavior changes)
 and the code was already reviewed after GREEN. After QA BLUE passes, the pipeline proceeds
@@ -342,7 +357,45 @@ Start by checking TaskList for available work.
 
 ## Phase 4: Autonomous Execution (self-coordinating)
 
-After spawning teammates, the lead does not do implementation work unless a teammate is stuck. The lead actively monitors messages and TaskList for coordination events: review dispatch, escalation, task proposals, and unblocked work. Teammates self-coordinate via TaskList for implementation tasks.
+After spawning teammates, the lead enters its monitoring loop (see below). The lead does not do implementation work unless a teammate is stuck. Teammates self-coordinate via the shared task list. The team stays alive until all shutdown criteria are met - this is the autonomous loop.
+
+### Lead Monitoring Loop
+
+After spawning teammates, the lead enters a continuous monitoring loop. The lead
+does NOT stop or go silent - it actively processes every incoming message and
+idle notification until shutdown criteria are met.
+
+```
+while shutdown criteria NOT met:
+  wait for next message (auto-delivered)
+
+  on any notification: check TaskList
+    - unclaimed unblocked tasks exist -> message idle teammate about available work
+    - teammate has in-progress task -> nudge them to continue
+    - all tasks blocked/assigned -> no action needed
+
+  on "QA GREEN complete" -> dispatch review subagents (see Review Dispatch below)
+  on review verdicts -> process review loop (see Review Loop below)
+  on escalation/proposal -> handle per existing rules
+```
+
+### Shutdown Criteria (ALL must be true before proceeding to Phase 5)
+
+1. Every task in TaskList has status: completed
+2. No teammates have in-progress tasks
+3. Final verification passes:
+   - `make build` - PASS
+   - `make test` - PASS
+   - `make lint` - PASS
+   - `make test-integration` - PASS
+
+If final verification fails after all tasks show completed, the lead:
+1. Creates a "Fix: final verification failure" task with the exact error output
+2. Assigns it to an implementer (message them to wake up)
+3. Creates a corresponding QA task blocked by the fix task
+4. Continues the monitoring loop
+
+When all shutdown criteria are met, proceed to Phase 5. Do NOT shut down teammates until Phase 5 is complete (they may be needed for fix iterations if PR creation reveals issues).
 
 ### Execution Flow
 
@@ -354,6 +407,8 @@ After spawning teammates, the lead does not do implementation work unless a team
 
 ### Review Dispatch (lead-driven, just-in-time)
 
+Reviews run as subagents (no `team_name`/`name`) - they return a verdict and exit, without joining the team.
+
 When the verifier messages that QA GREEN is complete, the lead:
 1. Creates 4 review tasks via TaskCreate (security, standards, testing, architecture)
 2. Dispatches 4 review subagents in parallel (single message, 4 Task tool calls)
@@ -361,7 +416,7 @@ When the verifier messages that QA GREEN is complete, the lead:
 4. When ALL reviews are APPROVED (or after the review loop resolves all issues),
    marks the "Review gate" task as completed - this unblocks BLUE
 
-Review sub-tasks are informational (not direct blockers on BLUE). The upfront "Review gate"
+Review sub-tasks track verdicts (not direct blockers on BLUE). The upfront "Review gate"
 task is the sole gate between QA GREEN and BLUE. The lead controls it directly.
 
 This just-in-time creation of review sub-tasks prevents teammates from self-claiming review tasks before subagents are dispatched.
@@ -434,17 +489,7 @@ Mark each review task complete with the subagent's verdict in the task descripti
 
 ### QA Loop (verifier-driven)
 
-The verifier handles this autonomously:
-
-```
-while QA task not passing:
-  1. Verifier runs success criteria
-  2. If ALL PASS: mark QA task complete -> next tasks auto-unblock
-  3. If ANY FAIL: message implementer with exact failure output
-  4. Implementer fixes, commits, messages verifier
-  5. Verifier re-runs ALL criteria
-  6. If QA iteration >= 3: escalate to lead, lead escalates to user
-```
+The verifier handles QA iterations autonomously (see Verifier Prompt for full criteria and reporting format). The lead intervenes only on escalation (iteration >= 3).
 
 ### Review Loop (lead-driven)
 
@@ -519,19 +564,13 @@ The lead intervenes only for:
 
 After all TDD phases complete (or the user accepts current state):
 
-### Final Verification
+Shutdown criteria already verified `make build/test/lint/test-integration` pass.
 
-Run final checks (lead can do this directly):
+Prepare the PR:
 
 ```bash
-make build
-make test
-make lint
-make test-integration
 git log --oneline main..HEAD
 ```
-
-**Gate:** All must pass.
 
 ### Create PR
 
