@@ -201,8 +201,6 @@ func TestDetectionSummary(t *testing.T) {
 	t.Log("=== Injection Detection Summary ===")
 	t.Log("")
 
-	var results []detectionResult
-
 	for _, cfg := range configModes {
 		// Check availability first
 		available := true
@@ -227,7 +225,7 @@ func TestDetectionSummary(t *testing.T) {
 		totalDetected := 0
 		totalPrompts := 0
 
-		for category, prompts := range injectionPrompts {
+		for _, prompts := range injectionPrompts {
 			detected := 0
 			// For LLM/agent modes, limit prompts to reduce test time
 			testPrompts := prompts
@@ -241,13 +239,6 @@ func TestDetectionSummary(t *testing.T) {
 					detected++
 				}
 			}
-
-			results = append(results, detectionResult{
-				configName: cfg.name,
-				category:   category,
-				detected:   detected,
-				total:      len(testPrompts),
-			})
 
 			totalDetected += detected
 			totalPrompts += len(testPrompts)

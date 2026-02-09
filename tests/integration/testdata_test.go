@@ -333,15 +333,6 @@ var novelInjections = map[string][]string{
 	},
 }
 
-// novelInjectionList returns all novel injections as a flat slice for iteration.
-func novelInjectionList() []string {
-	var all []string
-	for _, injections := range novelInjections {
-		all = append(all, injections...)
-	}
-	return all
-}
-
 // -----------------------------------------------------------------------------
 // Configuration Templates
 // -----------------------------------------------------------------------------
