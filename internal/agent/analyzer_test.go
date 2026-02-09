@@ -411,6 +411,42 @@ func TestClaudeAnalyzer_BuildEnv(t *testing.T) {
 	}
 }
 
+func TestClaudeAnalyzer_BuildEnv_MapIsolation(t *testing.T) {
+	analyzer := NewClaudeAnalyzer("llama3:latest", ".", "ollama", "http://localhost:11434")
+	env1 := analyzer.buildEnv()
+	env2 := analyzer.buildEnv()
+
+	// Mutating one map must not affect the other
+	env1["ANTHROPIC_AUTH_TOKEN"] = "modified"
+	assert.Equal(t, "ollama", env2["ANTHROPIC_AUTH_TOKEN"])
+}
+
+func TestAnalyze_CancelledContext_BothProviders(t *testing.T) {
+	tests := []struct {
+		name     string
+		provider string
+		endpoint string
+	}{
+		{"claude provider", "claude", ""},
+		{"ollama provider", "ollama", "http://localhost:11434"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			analyzer := NewClaudeAnalyzer("test-model", ".", tt.provider, tt.endpoint)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			result, err := analyzer.Analyze(ctx, "test content")
+			require.Error(t, err)
+			assert.Nil(t, result)
+			assert.True(t, errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded),
+				"error should be a context error, got: %v", err)
+		})
+	}
+}
+
 func TestClaudeAnalyzer_BuildEnv_Concurrent(t *testing.T) {
 	analyzer := NewClaudeAnalyzer("test-model", ".", "ollama", "http://localhost:11434")
 
