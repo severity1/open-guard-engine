@@ -15,7 +15,7 @@ You are the **lead** for an autonomous TDD team. You design the task graph, spaw
 **Input check:** If `$ARGUMENTS` is empty, stop immediately:
 "No issue numbers provided. Usage: /tdd-team <issue-numbers> (e.g., /tdd-team 42 or /tdd-team 42 43)"
 
-Verify the working tree is clean and all quality checks pass (see Makefile).
+Verify the working tree is clean and all existing quality checks pass.
 
 **Gate:** All checks must pass. Fix issues before proceeding.
 
@@ -26,10 +26,17 @@ Verify the working tree is clean and all quality checks pass (see Makefile).
 Enter plan mode, then:
 
 1. **Fetch issues** (body and comments) for each issue number
-2. **Explore codebase** using Explore agents to understand affected files, packages, patterns
-3. **Design the task graph** (see below)
-4. **Determine team composition** based on scope discovered during exploration
-5. **Present the plan** via `ExitPlanMode()`
+2. **Build a project profile** by exploring the codebase (use Explore agents):
+   - Build system and commands (e.g., Makefile, package.json, Cargo.toml)
+   - Test framework, how to run tests, and what test failure looks like
+   - Linter and quality gate commands
+   - What "RED" means for this language (compilation error, test failure, type error)
+   - Existing commit message conventions (check git log)
+   - Code patterns, architecture, and conventions (check CLAUDE.md if present)
+3. **Explore affected files**, packages/modules, and dependencies for the target issues
+4. **Design the task graph** (see below)
+5. **Determine team composition** based on scope discovered during exploration
+6. **Present the plan** via `ExitPlanMode()`
 
 ### Task Graph Structure
 
@@ -65,14 +72,6 @@ The lead determines track type during planning based on scope:
 - Lightweight: Dead code removal, renames, mechanical refactors with existing test coverage
 
 Both track types converge at the shared Review task.
-
-### Go-Specific RED Phase
-
-In Go, RED phase tests for new types or interfaces will not compile rather than
-producing test failures. This is expected. QA RED should verify:
-- The correct symbols are undefined (not unrelated breakage)
-- Other packages still compile and pass
-- The compilation errors match the task's success criteria
 
 ### Team Composition
 
@@ -110,7 +109,7 @@ Spawn teammates (never use `mode: "plan"`). Substitute actual teammate names int
 ### Implementer Prompt
 
 ```
-You are a TDD implementer for the open-guard-engine project (issue(s) #$ARGUMENTS).
+You are a TDD implementer on issue(s) #$ARGUMENTS.
 
 ## Self-Coordination Loop
 1. Check TaskList for unblocked, unassigned tasks
@@ -160,9 +159,9 @@ Exit conditions (ALL must be true):
 - Message the lead: "No available QA work. Standing by."
 
 ## QA Criteria
-- RED phase: build and lint pass, new tests FAIL (expected), no integration regressions
-- GREEN phase: all quality checks pass (build, test, lint, integration)
-- Review fix regression: all quality checks pass (build, test, lint, integration)
+- RED phase: existing quality gates pass, new tests FAIL as expected, no regressions
+- GREEN phase: all quality gates pass (per task success criteria)
+- Review fix regression: all quality gates pass (per task success criteria)
 
 ## Review Handoff
 When QA GREEN passes, message the lead: "QA GREEN complete. Ready for review dispatch."
@@ -201,7 +200,7 @@ Teammates self-coordinate via TaskList - the lead does NOT need to direct them t
 
 1. Every task in TaskList has status: completed
 2. No teammates have in-progress tasks
-3. Final verification passes: all quality checks (build, test, lint, integration)
+3. Final verification passes: all project quality gates pass
 
 If final verification fails after all tasks complete, create a fix task with exact error output, assign to an implementer, create a corresponding QA task blocked by the fix, and continue the loop.
 
@@ -225,7 +224,7 @@ The lead designs review prompts based on the changes. Use `paranoid-sentinel` fo
 When reviewers find issues, every fix must pass QA before re-review:
 1. Reviewer messages implementer with findings
 2. Implementer fixes, commits (`fix:` or `refactor:`)
-3. Lead creates a QA regression task for verifier (all quality checks must pass)
+3. Lead creates a QA regression task for verifier (all quality gates must pass)
 4. After QA regression passes, reviewer re-checks
 5. If review iteration >= 3: escalate to user
 
@@ -254,7 +253,7 @@ Team stays alive during escalation.
 
 ## Phase 5: PR Creation
 
-Shutdown criteria already verified all quality checks pass.
+Shutdown criteria already verified all quality gates pass.
 
 Push the branch and create a PR with this structure:
 
@@ -263,15 +262,10 @@ Push the branch and create a PR with this structure:
 <1-3 bullet points>
 
 ## Test Plan
-- [ ] Unit tests for new behavior
-- [ ] Positive detection, negative (safe), and bypass cases
-- [ ] Integration tests pass
+<checklist derived from the task graph's QA criteria>
 
 ## Review Summary
-- Security: [verdict]
-- Go Standards: [verdict]
-- Testing: [verdict]
-- Architecture: [verdict]
+<one line per review domain, derived from review dispatch>
 
 Closes #$ARGUMENTS
 ```
@@ -306,10 +300,8 @@ Session interruption kills all teammates (`/resume` does not restore them).
 
 ## Quick Reference
 
-**Commit Prefixes:** `test:` (RED), `feat:` (GREEN), `fix:` (iterations), `refactor:` (review fixes)
+**Commit Prefixes:** Discover from git log during Phase 2. Fallback: `test:` (RED), `feat:` (GREEN), `fix:` (iterations), `refactor:` (review fixes)
 
-**Threat Categories:** T1-T9 (technical), S1-S13 (safety/LLM)
-
-**QA Targets:** `make build`, `make test`, `make lint`, `make test-integration`
+**QA Targets:** Discover from project build system during Phase 2.
 
 **Iteration Budget:** 3 per QA loop, 3 per review loop (independent counters)
