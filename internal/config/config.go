@@ -69,10 +69,25 @@ func DefaultConfig() *Config {
 func (c *Config) Validate() error {
 	switch c.Mode {
 	case ModeStrict, ModeConfirm, ModePermissive:
-		return nil
+		// valid
 	default:
 		return fmt.Errorf("invalid mode: %q (must be strict, confirm, or permissive)", c.Mode)
 	}
+
+	if c.MaxInputSize < 0 {
+		return fmt.Errorf("max_input_size must be non-negative, got %d", c.MaxInputSize)
+	}
+	if c.Agent.TimeoutSeconds < 0 {
+		return fmt.Errorf("agent.timeout_seconds must be non-negative, got %d", c.Agent.TimeoutSeconds)
+	}
+	if c.LLM.TimeoutSeconds < 0 {
+		return fmt.Errorf("llm.timeout_seconds must be non-negative, got %d", c.LLM.TimeoutSeconds)
+	}
+	if c.Agent.Provider != "" && c.Agent.Provider != "claude" && c.Agent.Provider != "ollama" {
+		return fmt.Errorf("invalid agent provider: %q (must be claude or ollama)", c.Agent.Provider)
+	}
+
+	return nil
 }
 
 // Load loads configuration from the project directory.
