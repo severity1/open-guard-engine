@@ -29,6 +29,9 @@ type Analyzer interface {
 // Compile-time interface satisfaction check.
 var _ Analyzer = (*ClaudeAnalyzer)(nil)
 
+// queryFunc is the function signature for claudecode.Query, used for dependency injection in tests.
+type queryFunc func(ctx context.Context, prompt string, opts ...claudecode.Option) (claudecode.MessageIterator, error)
+
 // ClaudeAnalyzer detects prompt injection using Claude Code via the Agent SDK.
 // Supports two providers: "claude" (Anthropic API) or "ollama" (local models).
 type ClaudeAnalyzer struct {
@@ -36,6 +39,7 @@ type ClaudeAnalyzer struct {
 	projectRoot string
 	provider    string // "claude" or "ollama"
 	endpoint    string // Ollama endpoint (only for ollama provider)
+	queryFn     queryFunc
 }
 
 // NewClaudeAnalyzer creates a new Claude-based analyzer.
@@ -62,42 +66,30 @@ func NewClaudeAnalyzer(model, projectRoot, provider, endpoint string) *ClaudeAna
 		projectRoot: projectRoot,
 		provider:    provider,
 		endpoint:    endpoint,
+		queryFn:     claudecode.Query,
 	}
 }
 
-// setupOllamaEnv sets environment variables for Ollama provider and returns a cleanup function.
-// When provider is "ollama", it sets ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN
-// to route Claude Code SDK requests to the local Ollama endpoint.
-func (a *ClaudeAnalyzer) setupOllamaEnv() func() {
+// buildOllamaOpts returns claudecode.Options that configure the subprocess
+// environment for Ollama. Returns nil for non-ollama providers.
+// This avoids mutating process-global env vars (race-safe).
+func (a *ClaudeAnalyzer) buildOllamaOpts() []claudecode.Option {
 	if a.provider != "ollama" {
-		return func() {}
+		return nil
 	}
 
-	// Save original values
-	origToken := os.Getenv("ANTHROPIC_AUTH_TOKEN")
-	origKey := os.Getenv("ANTHROPIC_API_KEY")
-	origURL := os.Getenv("ANTHROPIC_BASE_URL")
-
-	// Set Ollama env vars
-	os.Setenv("ANTHROPIC_AUTH_TOKEN", "ollama")
-	os.Setenv("ANTHROPIC_API_KEY", "")
-	os.Setenv("ANTHROPIC_BASE_URL", a.endpoint)
-
-	// Return cleanup function to restore original values
-	return func() {
-		os.Setenv("ANTHROPIC_AUTH_TOKEN", origToken)
-		os.Setenv("ANTHROPIC_API_KEY", origKey)
-		os.Setenv("ANTHROPIC_BASE_URL", origURL)
+	return []claudecode.Option{
+		claudecode.WithEnv(map[string]string{
+			"ANTHROPIC_AUTH_TOKEN": "ollama",
+			"ANTHROPIC_API_KEY":   "",
+			"ANTHROPIC_BASE_URL":  a.endpoint,
+		}),
 	}
 }
 
 // Analyze checks if content contains prompt injection attempts.
 // content is raw unstructured text (prompt, command, etc.) from the plugin.
 func (a *ClaudeAnalyzer) Analyze(ctx context.Context, content string) (*Result, error) {
-	// Set up Ollama environment if needed
-	cleanup := a.setupOllamaEnv()
-	defer cleanup()
-
 	// SECURITY: Create isolated temp directory (no .claude/ configs)
 	// This prevents malicious projects from injecting settings, hooks, or plugins
 	tmpDir, err := os.MkdirTemp("", "open-guard-analyze-*")
@@ -108,8 +100,7 @@ func (a *ClaudeAnalyzer) Analyze(ctx context.Context, content string) (*Result, 
 
 	prompt := injectionAnalysisPrompt(content)
 
-	// Use Query API for one-shot analysis
-	iterator, err := claudecode.Query(ctx, prompt,
+	opts := []claudecode.Option{
 		claudecode.WithModel(a.model),
 		// SECURITY: Run from clean temp directory (no .claude/ configs to load)
 		claudecode.WithCwd(tmpDir),
@@ -124,7 +115,11 @@ func (a *ClaudeAnalyzer) Analyze(ctx context.Context, content string) (*Result, 
 		claudecode.WithSettingSources(claudecode.SettingSourceUser),
 		// SECURITY: Disable all MCP servers (no --mcp-config provided = none loaded)
 		claudecode.WithExtraArgs(map[string]*string{"strict-mcp-config": nil}),
-	)
+	}
+	opts = append(opts, a.buildOllamaOpts()...)
+
+	// Use Query API for one-shot analysis
+	iterator, err := a.queryFn(ctx, prompt, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("claude query: %w", err)
 	}
