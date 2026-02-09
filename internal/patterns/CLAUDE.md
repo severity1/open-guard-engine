@@ -45,6 +45,8 @@ patterns/
 - Uses `//go:embed patterns.yaml` for single-binary distribution
 - Patterns compiled at startup via `NewMatcher()`
 - Compilation errors are fatal (returned from constructor)
+- Category and severity validated at startup using `types.ParseThreatCategory()` and `types.ParseThreatLevel()`
+- Invalid pattern definitions fail fast with clear error messages
 
 **Pattern YAML Structure:**
 ```yaml

@@ -64,10 +64,17 @@ config/
 - `LoadFromPathWithHome()` for testing explicit paths
 - Test both global and project config precedence
 
+**Validation:**
+- `Validate()` method enforces strict validation on all config values
+- Mode must be one of: `strict`, `confirm`, `permissive`
+- Agent provider must be: `claude` or `ollama` (if set)
+- Negative timeout values rejected
+- Called automatically after config load, returns detailed errors
+
 **Error Handling:**
 - `Load()` - No error if config files missing (uses defaults)
 - `LoadFromPath()` - Errors if explicit path doesn't exist
-- Clear error messages: "config file not found: {path}"
+- Clear error messages: "config file not found: {path}", "invalid mode: {value}"
 
 <!-- END AUTO-MANAGED -->
 
