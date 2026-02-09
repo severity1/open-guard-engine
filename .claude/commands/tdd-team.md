@@ -48,6 +48,32 @@ Every task description MUST include:
 
 For multi-issue work, create parallel tracks. Add cross-dependencies between tracks ONLY when files overlap (check during planning). The Review and PR tasks are shared across tracks.
 
+### Track Types
+
+**Standard Track** (default): For issues requiring new tests and implementation.
+```
+RED -> QA RED -> GREEN -> QA GREEN
+```
+
+**Lightweight Track**: For cleanup, deletion, or mechanical changes where the "test" is an existing tool output (lint, build).
+```
+IMPLEMENT -> QA VERIFY
+```
+
+The lead determines track type during planning based on scope:
+- Standard: New features, interfaces, validation logic, anything requiring new test code
+- Lightweight: Dead code removal, renames, mechanical refactors with existing test coverage
+
+Both track types converge at the shared Review task.
+
+### Go-Specific RED Phase
+
+In Go, RED phase tests for new types or interfaces will not compile rather than
+producing test failures. This is expected. QA RED should verify:
+- The correct symbols are undefined (not unrelated breakage)
+- Other packages still compile and pass
+- The compilation errors match the task's success criteria
+
 ### Team Composition
 
 The lead determines team size during planning based on scope:
@@ -88,10 +114,11 @@ You are a TDD implementer for the open-guard-engine project (issue(s) #$ARGUMENT
 
 ## Self-Coordination Loop
 1. Check TaskList for unblocked, unassigned tasks
-2. Claim the lowest-ID available task via TaskUpdate (set owner to your name)
-3. Work the task to completion
-4. Mark it completed via TaskUpdate
-5. Go to step 1
+2. Filter to implementation tasks only (names containing RED, GREEN, IMPLEMENT, or fix - NOT containing QA or verify)
+3. Claim the lowest-ID matching task via TaskUpdate (set owner to your name)
+4. Work the task to completion
+5. Mark it completed via TaskUpdate
+6. Go to step 1
 
 Exit conditions (ALL must be true):
 - No unblocked, unassigned tasks remain
@@ -120,11 +147,12 @@ Start by checking TaskList for available work.
 You are the QA verifier for the TDD team on issue(s) #$ARGUMENTS.
 
 ## Self-Coordination Loop
-1. Check TaskList for unblocked, unassigned QA tasks
-2. Claim the lowest-ID available QA task via TaskUpdate (set owner to your name)
-3. Run ALL success criteria from the task description - report every failure, not just the first
-4. If pass: mark completed, go to step 1
-5. If fail: message the implementer with exact output, wait for fix, re-run (max 3 iterations then escalate to lead)
+1. Check TaskList for unblocked, unassigned tasks
+2. Filter to QA/verification tasks only (names containing QA, verify, or VERIFY)
+3. Claim the lowest-ID matching task via TaskUpdate (set owner to your name)
+4. Run ALL success criteria from the task description - report every failure, not just the first
+5. If pass: mark completed, go to step 1
+6. If fail: message the implementer with exact output, wait for fix, re-run (max 3 iterations then escalate to lead)
 
 Exit conditions (ALL must be true):
 - No unblocked, unassigned QA tasks remain
@@ -160,14 +188,14 @@ Teammates self-coordinate via the shared task list. The lead monitors continuous
 ```
 while shutdown criteria NOT met:
   wait for next message (auto-delivered)
-  on any notification: check TaskList
-    - unclaimed unblocked tasks -> message idle teammate about available work
-    - teammate has in-progress task -> nudge to continue
-    - all tasks blocked/assigned -> no action needed
+  on task completion notification: check TaskList for stale or stuck state
   on "QA GREEN complete" -> dispatch reviews (spawn reviewer teammates)
   on review verdicts -> process review loop (fix -> QA regression -> re-review)
   on escalation/proposal -> handle per rules below
+  on idle notification with no available work -> acknowledge, no action needed
 ```
+
+Teammates self-coordinate via TaskList - the lead does NOT need to direct them to unclaimed tasks or nudge in-progress work. Only intervene on stale state (task in-progress with no activity) or escalation.
 
 ### Shutdown Criteria (ALL must be true)
 
@@ -250,10 +278,11 @@ Closes #$ARGUMENTS
 
 ### Team Cleanup
 
-1. Send `shutdown_request` to each teammate by name
-2. Wait for confirmations
-3. `TeamDelete()`
-4. Provide the PR URL to the user
+1. Stop any background tasks related to the team's work (test runs, builds, etc.) via TaskStop
+2. Send `shutdown_request` to each teammate by name
+3. Wait for confirmations
+4. `TeamDelete()`
+5. Provide the PR URL to the user
 
 ---
 
