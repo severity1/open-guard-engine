@@ -23,6 +23,9 @@ agent/
 - `MockAnalyzer` - Test implementation for unit testing without Claude Code installation
 - `Result` - Analysis result (Safe, Categories, Reason)
 
+**Key Functions:**
+- `collectResponse()` - Extracts text from iterator with context cancellation between iterations
+
 **Security Isolation:**
 The analyzer runs in a hardened sandbox:
 - Creates isolated temp directory (no `.claude/` configs to load)
@@ -37,12 +40,12 @@ The analyzer runs in a hardened sandbox:
 
 **Provider Pattern:**
 - `provider` field: `"claude"` (default) or `"ollama"`
-- Ollama requires env var setup via `setupOllamaEnv()`
-- Cleanup functions restore original env vars
+- Ollama env vars passed to subprocess via `buildEnv()` and `claudecode.WithEnv()`
+- Returns env map for subprocess, not parent process mutation (avoids race conditions)
 
 **Context & Timeout Handling:**
 - `Analyze()` accepts context for timeout and cancellation
-- Checks `ctx.Done()` before each iterator iteration
+- `collectResponse()` checks `ctx.Done()` before each iterator iteration using `select`
 - Distinguishes `ctx.Err()` from operation errors
 - Returns context errors immediately without wrapping
 - `IsAvailable()` uses 3s timeout via `exec.CommandContext`
@@ -61,6 +64,11 @@ The analyzer runs in a hardened sandbox:
 - Compile-time interface checks: `var _ Analyzer = (*ClaudeAnalyzer)(nil)`
 - `MockAnalyzer` for testing without actual Claude Code installation
 - Configurable mock responses: `SafeResponse`, `Categories`, `Reason`, `ShouldError`, `Available`
+- Table-driven tests with `testify/assert` and `testify/require`
+- Custom `mockIterator` for testing `collectResponse()` with various scenarios
+- Tests for context cancellation, `ErrNoMoreMessages` handling, and error propagation
+- TDD approach: tests written before implementation (e.g., `buildEnv()` tests)
+- Coverage: 95.5% as of commit cad6545
 
 <!-- END AUTO-MANAGED -->
 
