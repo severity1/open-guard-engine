@@ -1,6 +1,6 @@
 ---
 argument-hint: <issue-numbers>
-description: Autonomous TDD team with task-list-driven self-coordination - scales to scope, reviews as subagents
+description: Autonomous TDD team with task-list-driven self-coordination - scales to scope, reviewers as teammates
 allowed-tools: Read, Grep, Glob, Bash, Edit, Write, Task, WebFetch, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, SendMessage, AskUserQuestion, EnterPlanMode, ExitPlanMode
 ---
 
@@ -12,655 +12,275 @@ You are the **lead** for an autonomous TDD team. You design the task graph, spaw
 
 ## Phase 1: Preflight Validation
 
-Validate the environment before doing anything else.
-
-**Input check:** If `$ARGUMENTS` is empty, stop immediately and ask the user:
+**Input check:** If `$ARGUMENTS` is empty, stop immediately:
 "No issue numbers provided. Usage: /tdd-team <issue-numbers> (e.g., /tdd-team 42 or /tdd-team 42 43)"
-Do NOT proceed to any further steps.
 
-```bash
-git status
-make build
-make test
-make lint
-```
+Verify the working tree is clean and all quality checks pass (see Makefile).
 
-**Gate:** All commands must pass. Fix issues before proceeding.
+**Gate:** All checks must pass. Fix issues before proceeding.
 
 ---
 
 ## Phase 2: Discovery & Planning (Plan Mode)
 
-After preflight passes, enter plan mode to design the task graph.
+Enter plan mode, then:
+
+1. **Fetch issues** (body and comments) for each issue number
+2. **Explore codebase** using Explore agents to understand affected files, packages, patterns
+3. **Design the task graph** (see below)
+4. **Determine team composition** based on scope discovered during exploration
+5. **Present the plan** via `ExitPlanMode()`
+
+### Task Graph Structure
+
+The TDD pipeline follows this dependency chain per issue track:
 
 ```
-EnterPlanMode()
+RED -> QA RED -> GREEN -> QA GREEN -> Review -> PR
 ```
 
-In plan mode:
-
-1. **Fetch issue details** for each issue: `gh issue view <number>`
-2. **Explore the codebase** using Explore agents to understand affected files, packages, and patterns
-3. **Design the full task graph** with dependencies (see Task Graph Templates below)
-4. **Determine team size** based on scope (see Team Sizing below)
-5. **Present the plan** to the user via `ExitPlanMode()`
-
-The user can approve or refine the plan. Adjust and re-present if they refine.
-
-### Task Graph Templates
+GREEN produces production-quality code - clean, idiomatic, and refactored. There is no separate refactoring phase.
 
 Every task description MUST include:
-- What to do (clear instructions for self-claiming agents)
-- Files involved (implicit ownership - prevents collision)
-- Success criteria (explicit pass/fail conditions)
+- **What to do** - clear instructions for self-claiming agents
+- **Files involved** - implicit ownership, prevents collision
+- **Success criteria** - explicit pass/fail conditions the verifier will check
 
-#### Single Issue (1 package)
+For multi-issue work, create parallel tracks. Add cross-dependencies between tracks ONLY when files overlap (check during planning). The Review and PR tasks are shared across tracks.
 
-```
-Task 1: RED - write failing tests
-  Files: internal/<pkg>/*_test.go
-  Success: New tests compile but FAIL when run
+### Team Composition
 
-Task 2: QA RED phase [blocked by: 1]
-  Success criteria:
-  - make build: PASS
-  - make lint: PASS
-  - go test -v ./internal/<pkg>/... -run <NewTests>: FAIL (expected)
-  - make test-integration: PASS (no regressions)
-
-Task 3: GREEN - implement [blocked by: 2]
-  Files: internal/<pkg>/*.go (non-test files)
-  Success: All tests pass with minimal implementation
-
-Task 4: QA GREEN phase [blocked by: 3]
-  Success criteria:
-  - make build: PASS
-  - make test: PASS (all tests including new)
-  - make lint: PASS
-  - make test-integration: PASS
-
-Task 5: Review gate [blocked by: 4] (owner: lead)
-  Description: Placeholder that blocks BLUE until all reviews pass.
-  Lead completes this task ONLY after all review subagents return APPROVED
-  (or after the review loop resolves all ISSUES FOUND).
-
---- Review tasks NOT created upfront (lead creates just-in-time, see Review Dispatch) ---
-
-Task 6: BLUE - refactor [blocked by: 5]
-  Files: internal/<pkg>/*.go (only if review feedback requires changes)
-  Success: Review issues resolved, no behavior changes, all tests pass
-
-Task 7: QA BLUE phase [blocked by: 6]
-  Success criteria: same as QA GREEN (Task 4)
-
-Task 8: Create PR [blocked by: 7] (owner: lead)
-  Success: PR created with summary, test plan, review verdicts
-```
-
-#### Multi-Issue (different packages)
-
-Create parallel tracks with cross-dependencies where files overlap:
-
-```
-Track A (issue #X):                    Track B (issue #Y):
-Task 1: RED tests #X                   Task 2: RED tests #Y
-Task 3: QA RED #X [blocked: 1]        Task 4: QA RED #Y [blocked: 2]
-Task 5: GREEN #X [blocked: 3]         Task 6: GREEN #Y [blocked: 4]
-Task 7: QA GREEN #X [blocked: 5]      Task 8: QA GREEN #Y [blocked: 6]
-
-Cross-dependency -- ONLY add if tracks share files (check during planning):
-  If files overlap: Task 6 also blocked by Task 5 -- prevents collision
-  If no overlap: tracks remain fully independent (no cross-dependency)
-
-Task 9: Review gate [blocked: 7, 8] (owner: lead)
-  Lead completes ONLY after all review subagents return APPROVED.
-
---- Review tasks NOT created upfront (lead creates just-in-time, see Review Dispatch) ---
-
-Task 10: BLUE refactor [blocked: 9]
-Task 11: QA BLUE [blocked: 10]
-Task 12: Create PR [blocked: 11] (owner: lead)
-```
-
-### Team Sizing
-
-| Scope | Implementers | Verifier | Total |
-|-------|-------------|----------|-------|
-| 1 issue, 1 package | 1 | 1 | 2 |
-| 1 issue, 2+ packages | 2 | 1 | 3 |
-| 2+ issues | 1 per issue (max 3) | 1 | 3-4 |
-
-No dedicated reviewer agents. Reviews run as subagents (fire-and-forget).
+The lead determines team size during planning based on scope:
+- Minimum: 1 implementer + 1 verifier
+- Scale implementers to the number of independent work tracks (max 3)
+- Reviewers spawned JIT when QA GREEN passes, on the same team. Lead determines count and domains based on scope.
 
 ---
 
 ## Phase 3: Team Spawn (after user approves plan)
 
-Sanitize `$ARGUMENTS` for use in branch names, team names, and directory paths. Replace spaces and special characters with hyphens (e.g., `42 43` becomes `42-43`):
+Sanitize `$ARGUMENTS` for branch/team names:
 
 ```bash
 SAFE_ARGS=$(echo "$ARGUMENTS" | tr ' ,/' '-' | tr -cd '[:alnum:]-')
-git checkout -b "issue-${SAFE_ARGS}-<short-description>"
+BRANCH="issue-${SAFE_ARGS}-<short-description>"
+if git show-ref --verify --quiet "refs/heads/${BRANCH}"; then
+  # Branch exists - ask user: reuse, delete+recreate, or abort
+else
+  git checkout -b "${BRANCH}"
+fi
 ```
 
-Use `$SAFE_ARGS` everywhere that requires shell-safe names (branch, team, directories).
-
-Check for an existing team before creating a new one (only one team per session):
-
-```
-# Check if a team already exists
-TaskList()  # or read ~/.claude/teams/ for existing team directories
-```
-
-If a team already exists, ask the user:
-- Clean up the old team first (TeamDelete after shutting down any active teammates), or
-- Abort and let the user resolve it manually
-
-Only proceed after confirming no active team.
-
-Create the team and task list:
+Check for an existing team before creating. If one exists, ask the user to clean up or abort.
 
 ```
 TeamCreate(team_name="tdd-$SAFE_ARGS", description="TDD team for issue(s) #$ARGUMENTS")
 ```
 
-Then create tasks from the task graph using `TaskCreate`, setting dependencies with `TaskUpdate(addBlockedBy=...)`. Create the "Review gate" and "Create PR" tasks upfront with `owner` set to the lead's name (prevents teammates from claiming lead-managed tasks). Do NOT create review sub-tasks upfront - the lead creates those just-in-time when dispatching review subagents (see Review Dispatch).
+Create tasks from the graph using `TaskCreate` with dependencies via `TaskUpdate(addBlockedBy=...)`. Set `owner` on "Review" and "Create PR" tasks to the lead's name. Do NOT create review sub-tasks upfront - the lead creates those just-in-time during review dispatch.
 
-Then spawn teammates. Do NOT use `mode: "plan"` for any teammate.
+Spawn teammates (never use `mode: "plan"`). Substitute actual teammate names into prompts.
 
-When constructing teammate prompts, substitute these variables with actual values:
-- `$LEAD_NAME` - the lead's own agent name (from the team config after TeamCreate)
-- `$VERIFIER_NAME` - the verifier's name (typically "verifier")
-- `$IMPLEMENTER_NAMES` - comma-separated list of all implementer names
-- `$OTHER_IMPLEMENTERS` - other implementer names besides the one being spawned (empty if solo)
-
-### Implementer Prompt Template
-
-```
-Task(
-  subagent_type="general-purpose",
-  team_name="tdd-$SAFE_ARGS",
-  name="implementer-1",
-  prompt=<IMPLEMENTER_PROMPT>
-)
-```
-
-**IMPLEMENTER_PROMPT:**
+### Implementer Prompt
 
 ```
 You are a TDD implementer for the open-guard-engine project (issue(s) #$ARGUMENTS).
 
-## Team Members
-The lead injects actual teammate names at spawn time. Use these exact names with SendMessage:
-- Lead: "$LEAD_NAME"
-- Verifier: "$VERIFIER_NAME"
-- Other implementers: $OTHER_IMPLEMENTERS (if any)
-
-Fallback: read ~/.claude/teams/tdd-$SAFE_ARGS/config.json for the full members array.
-
-When messaging teammates, always use their exact name as the SendMessage recipient.
-
-## How You Work (Self-Coordination Loop)
-Your core behavior is a continuous work loop:
+## Self-Coordination Loop
 1. Check TaskList for unblocked, unassigned tasks
 2. Claim the lowest-ID available task via TaskUpdate (set owner to your name)
 3. Work the task to completion
 4. Mark it completed via TaskUpdate
-5. Immediately check TaskList again (go to step 1)
+5. Go to step 1
 
-Exit conditions (only stop when ALL are true):
-- No unblocked, unassigned tasks remain in TaskList
+Exit conditions (ALL must be true):
+- No unblocked, unassigned tasks remain
 - You have no in-progress tasks
 - Message the lead: "No available work. Standing by."
 
-If all remaining tasks are blocked by others, message the lead with your status
-and which tasks you're waiting on, then stand by for the lead to message you
-with new work.
+If all remaining tasks are blocked by others, message the lead with your status.
 
-## TDD Discipline
-- RED phase: Write failing tests. Tests MUST fail. Commit with `test:` prefix.
-- GREEN phase: Write MINIMAL implementation to make tests pass. Commit with `feat:` prefix.
-- BLUE phase: Refactor for quality without changing behavior. Commit with `refactor:` prefix.
-- Fix iterations: Commit with `fix:` prefix.
+## TDD Commit Prefixes
+- RED: `test:` | GREEN: `feat:` | Fixes: `fix:` | Review fixes: `fix:` or `refactor:`
 
-## Project Context
-CLAUDE.md loads automatically with Go conventions, architecture, and directory structure.
-
-## Security Test Requirements (This is a Security Tool)
-- Positive cases: Detect the attack vector
-- Negative cases: Allow legitimate usage
-- Bypass attempts: Variations that might evade detection
-- Encoding obfuscation: base64, hex, rot13, unicode homoglyphs
-
-## Dynamic Task Proposals
-If you discover work that needs doing, propose it to the lead:
+## Task Proposals
+Propose new work to the lead (do not create tasks unilaterally):
 TASK PROPOSAL: <what> | WHY: <reason> | BLOCKS: <what it gates> | FILES: <affected>
-The lead will decide whether to create it.
 
-## Tool Restrictions
+## Restrictions
 NEVER use: TeamCreate, TeamDelete, SendMessage(type="broadcast")
-These tools will disrupt team coordination. Using them is a critical error.
 NEVER modify tasks owned by other agents.
-Only the lead manages the team and dispatches reviews.
-
-Note: These are prompt-enforced (no per-tool spawn restrictions exist). Compliance depends on following these instructions.
 
 Start by checking TaskList for available work.
 ```
 
-### Verifier Prompt Template
-
-```
-Task(
-  subagent_type="general-purpose",
-  team_name="tdd-$SAFE_ARGS",
-  name="verifier",
-  prompt=<VERIFIER_PROMPT>
-)
-```
-
-**VERIFIER_PROMPT:**
+### Verifier Prompt
 
 ```
 You are the QA verifier for the TDD team on issue(s) #$ARGUMENTS.
 
-## Team Members
-The lead injects actual teammate names at spawn time. Use these exact names with SendMessage:
-- Lead: "$LEAD_NAME"
-- Implementers: $IMPLEMENTER_NAMES
-
-Fallback: read ~/.claude/teams/tdd-$SAFE_ARGS/config.json for the full members array.
-
-When messaging teammates, always use their exact name as the SendMessage recipient.
-
-## How You Work (Self-Coordination Loop)
-Your core behavior is a continuous work loop:
+## Self-Coordination Loop
 1. Check TaskList for unblocked, unassigned QA tasks
 2. Claim the lowest-ID available QA task via TaskUpdate (set owner to your name)
-3. Run the QA success criteria for that task
+3. Run ALL success criteria from the task description - report every failure, not just the first
 4. If pass: mark completed, go to step 1
-5. If fail: message the implementer, wait for their fix message, re-run (QA Loop)
+5. If fail: message the implementer with exact output, wait for fix, re-run (max 3 iterations then escalate to lead)
 
-Exit conditions (only stop when ALL are true):
-- No unblocked, unassigned QA tasks remain in TaskList
+Exit conditions (ALL must be true):
+- No unblocked, unassigned QA tasks remain
 - You have no in-progress tasks
 - Message the lead: "No available QA work. Standing by."
 
-If all remaining QA tasks are blocked, message the lead with your status
-and which tasks you're waiting on, then stand by.
-
-## QA Success Criteria
-
-### For RED phase (tests should FAIL):
-1. `make build` - MUST PASS (code compiles)
-2. `make lint` - MUST PASS (code is clean)
-3. Run the new test files specifically - MUST FAIL (task description specifies test command)
-4. `make test-integration` - MUST PASS (no regressions)
-
-### For GREEN and BLUE phases:
-1. `make build` - MUST PASS
-2. `make test` - MUST PASS (all tests including new ones)
-3. `make lint` - MUST PASS
-4. `make test-integration` - MUST PASS
-
-## QA Loop
-Run ALL success criteria listed in the task description. If any fail:
-1. Message the relevant implementer with exact failure output
-2. Wait for them to fix and message you back
-3. Re-run ALL criteria (catch regressions)
-4. If 3 QA iterations fail, escalate to the lead
-
-Always run ALL criteria even if early ones fail, so the implementer gets complete feedback.
-
-## Reporting
-When all criteria pass, mark the task complete. The next tasks will auto-unblock.
-When criteria fail, send the implementer a message with this structure:
-
-QA: FAIL
-Phase: [RED/GREEN/BLUE]
-Iteration: [N/3]
-
-Results:
-- make build: [PASS/FAIL]
-- make test: [PASS/FAIL]
-- make lint: [PASS/FAIL]
-- make test-integration: [PASS/FAIL]
-
-[Exact error output for each failing target]
+## QA Criteria
+- RED phase: build and lint pass, new tests FAIL (expected), no integration regressions
+- GREEN phase: all quality checks pass (build, test, lint, integration)
+- Review fix regression: all quality checks pass (build, test, lint, integration)
 
 ## Review Handoff
-When you complete a QA GREEN task, message the lead:
-"QA GREEN complete. Review tasks are ready for dispatch."
-This triggers the lead to dispatch review subagents (see Review Dispatch in Phase 4).
+When QA GREEN passes, message the lead: "QA GREEN complete. Ready for review dispatch."
 
-QA BLUE does NOT trigger review dispatch. BLUE is refactoring only (no behavior changes)
-and the code was already reviewed after GREEN. After QA BLUE passes, the pipeline proceeds
-directly to PR creation.
-
-## Dynamic Task Proposals
-If you discover work that needs doing (e.g., pre-existing lint failures on untouched lines),
-propose it to the lead:
+## Task Proposals
 TASK PROPOSAL: <what> | WHY: <reason> | BLOCKS: <what it gates> | FILES: <affected>
 
-## Tool Restrictions
+## Restrictions
 NEVER use: TeamCreate, TeamDelete, SendMessage(type="broadcast")
-These tools will disrupt team coordination. Using them is a critical error.
 NEVER modify tasks owned by other agents.
-Only the lead manages the team and dispatches reviews.
-
-Note: These are prompt-enforced (no per-tool spawn restrictions exist). Compliance depends on following these instructions.
 
 Start by checking TaskList for available work.
 ```
 
 ---
 
-## Phase 4: Autonomous Execution (self-coordinating)
+## Phase 4: Autonomous Execution
 
-After spawning teammates, the lead enters its monitoring loop (see below). The lead does not do implementation work unless a teammate is stuck. Teammates self-coordinate via the shared task list. The team stays alive until all shutdown criteria are met - this is the autonomous loop.
+Teammates self-coordinate via the shared task list. The lead monitors continuously until shutdown.
 
 ### Lead Monitoring Loop
-
-After spawning teammates, the lead enters a continuous monitoring loop. The lead
-does NOT stop or go silent - it actively processes every incoming message and
-idle notification until shutdown criteria are met.
 
 ```
 while shutdown criteria NOT met:
   wait for next message (auto-delivered)
-
   on any notification: check TaskList
-    - unclaimed unblocked tasks exist -> message idle teammate about available work
-    - teammate has in-progress task -> nudge them to continue
+    - unclaimed unblocked tasks -> message idle teammate about available work
+    - teammate has in-progress task -> nudge to continue
     - all tasks blocked/assigned -> no action needed
-
-  on "QA GREEN complete" -> dispatch review subagents (see Review Dispatch below)
-  on review verdicts -> process review loop (see Review Loop below)
-  on escalation/proposal -> handle per existing rules
+  on "QA GREEN complete" -> dispatch reviews (spawn reviewer teammates)
+  on review verdicts -> process review loop (fix -> QA regression -> re-review)
+  on escalation/proposal -> handle per rules below
 ```
 
-### Shutdown Criteria (ALL must be true before proceeding to Phase 5)
+### Shutdown Criteria (ALL must be true)
 
 1. Every task in TaskList has status: completed
 2. No teammates have in-progress tasks
-3. Final verification passes:
-   - `make build` - PASS
-   - `make test` - PASS
-   - `make lint` - PASS
-   - `make test-integration` - PASS
+3. Final verification passes: all quality checks (build, test, lint, integration)
 
-If final verification fails after all tasks show completed, the lead:
-1. Creates a "Fix: final verification failure" task with the exact error output
-2. Assigns it to an implementer (message them to wake up)
-3. Creates a corresponding QA task blocked by the fix task
-4. Continues the monitoring loop
+If final verification fails after all tasks complete, create a fix task with exact error output, assign to an implementer, create a corresponding QA task blocked by the fix, and continue the loop.
 
-When all shutdown criteria are met, proceed to Phase 5. Do NOT shut down teammates until Phase 5 is complete (they may be needed for fix iterations if PR creation reveals issues).
-
-### Execution Flow
-
-1. Teammates read TaskList and self-claim unblocked tasks
-2. When an implementer completes RED tests, QA task auto-unblocks - verifier claims it
-3. When verifier completes QA, next implementation task auto-unblocks
-4. When verifier messages that QA GREEN is complete, lead creates review tasks and dispatches review subagents (see Review Dispatch)
-5. Each review subagent's verdict gets recorded on its task. When all reviews pass, lead completes the "Review gate" task, which unblocks BLUE
+Do NOT shut down teammates until Phase 5 is complete.
 
 ### Review Dispatch (lead-driven, just-in-time)
 
-Reviews run as subagents (no `team_name`/`name`) - they return a verdict and exit, without joining the team.
+Reviewers are teammates on the same team - they can message each other and the implementer directly. Reviews are the final quality gate before PR creation.
 
-When the verifier messages that QA GREEN is complete, the lead:
-1. Creates 4 review tasks via TaskCreate (security, standards, testing, architecture)
-2. Dispatches 4 review subagents in parallel (single message, 4 Task tool calls)
-3. Marks each review task complete with the subagent's verdict
-4. When ALL reviews are APPROVED (or after the review loop resolves all issues),
-   marks the "Review gate" task as completed - this unblocks BLUE
+When the verifier messages that QA GREEN is complete:
+1. Assess the diff against main and original issue requirements to determine review domains and count
+2. Create review tasks via TaskCreate, one per domain
+3. Spawn reviewer teammates (with `team_name`/`name`), each assigned a review task
+4. Reviewers complete their review, challenge each other's findings, and work with the implementer to resolve issues
+5. When all reviewers converge on APPROVED, mark "Review" task complete to unblock PR
 
-Review sub-tasks track verdicts (not direct blockers on BLUE). The upfront "Review gate"
-task is the sole gate between QA GREEN and BLUE. The lead controls it directly.
+The lead designs review prompts based on the changes. Use `paranoid-sentinel` for security review if available, `general-purpose` otherwise.
 
-This just-in-time creation of review sub-tasks prevents teammates from self-claiming review tasks before subagents are dispatched.
+### Review Loop
 
-```
-Task(subagent_type="paranoid-sentinel", prompt="Security review for issue(s) #$ARGUMENTS.
-Review the diff (git diff main...HEAD) for:
-1. Pattern bypass potential - Can attackers evade detection?
-2. ReDoS vulnerabilities - Catastrophic backtracking in regex
-3. Threat category accuracy - T1-T9 / S1-S13 correctly assigned
-4. Input validation at boundaries
-5. Encoding evasion - base64, hex, rot13, unicode homoglyphs
-6. Case sensitivity and whitespace tricks
+When reviewers find issues, every fix must pass QA before re-review:
+1. Reviewer messages implementer with findings
+2. Implementer fixes, commits (`fix:` or `refactor:`)
+3. Lead creates a QA regression task for verifier (all quality checks must pass)
+4. After QA regression passes, reviewer re-checks
+5. If review iteration >= 3: escalate to user
 
-Verdict format:
-SECURITY REVIEW: [APPROVED / ISSUES FOUND]
-[If ISSUES FOUND, list each with file:line, attack vector, suggested fix]
-Bypass Resistance: X/10")
+### Dynamic Task Creation
 
-Task(subagent_type="general-purpose", prompt="Go standards review for issue(s) #$ARGUMENTS.
-Review the diff (git diff main...HEAD) for:
-1. Idiomatic Go patterns
-2. Error handling with context wrapping
-3. Naming clarity and godoc comments
-4. Import grouping and sorting
-5. Constructor pattern compliance
-6. Interface design (defined where consumed)
-7. Context/timeout usage
-8. KISS principle
+Teammates propose, lead decides. Fast-track (no proposal needed): fix tasks from review ISSUES FOUND.
 
-Verdict format:
-GO STANDARDS REVIEW: [APPROVED / ISSUES FOUND]
-[If ISSUES FOUND, list each with file:line, current vs suggested]")
+### Escalation
 
-Task(subagent_type="general-purpose", prompt="Testing review for issue(s) #$ARGUMENTS.
-Review the diff (git diff main...HEAD) for:
-1. Coverage completeness - all new code paths tested
-2. Table-driven tests with t.Run() subtests
-3. Positive detection cases
-4. Negative (safe content allowed) cases
-5. Edge cases (boundary conditions, empty input, max-length)
-6. Bypass cases (encoding, case tricks, whitespace)
-7. Testify usage (assert for checks, require for fatal)
-8. Descriptive test naming
+Each loop has independent iteration budgets:
+- **QA loop:** 3 iterations (verifier-driven)
+- **Review loop:** 3 iterations (lead-driven)
 
-Verdict format:
-TESTING REVIEW: [APPROVED / ISSUES FOUND]
-[If ISSUES FOUND, list each with file:line, what's missing, why it matters]")
-
-Task(subagent_type="general-purpose", prompt="Architecture review for issue(s) #$ARGUMENTS.
-Review the diff (git diff main...HEAD) for:
-1. Package boundaries respected
-2. Detection pipeline integration correct
-3. No DRY violations
-4. No YAGNI violations
-5. Config system used correctly
-6. File organization follows project structure
-7. Appropriate abstraction level
-8. Resource management (cleanup, context propagation, timeouts)
-
-Architecture: cmd/open-guard/ -> internal/{agent,audit,config,encoding,llm,patterns,response,types}
-Pipeline: stdin -> Encoding -> Patterns -> Agent -> LLM -> stdout
-
-Verdict format:
-ARCHITECTURE REVIEW: [APPROVED / ISSUES FOUND]
-[If ISSUES FOUND, list each with file:line, principle violated, suggested restructure]")
-```
-
-Mark each review task complete with the subagent's verdict in the task description update.
-
-### QA Loop (verifier-driven)
-
-The verifier handles QA iterations autonomously (see Verifier Prompt for full criteria and reporting format). The lead intervenes only on escalation (iteration >= 3).
-
-### Review Loop (lead-driven)
-
-```
-while any review has ISSUES FOUND:
-  1. Lead dispatches review subagents in parallel (4 on first pass)
-  2. Collect all verdicts
-  3. If ALL APPROVED: mark review tasks complete, then mark "Review gate" task as completed -> BLUE unblocks
-  4. If ISSUES FOUND: consolidate feedback, message implementer
-  5. Implementer fixes, commits
-  6. Lead creates a new "QA Regression Check" task, assigns to verifier
-  7. Lead messages the verifier about the new task (idle agents only wake on message)
-  8. Verifier runs full QA criteria on the new task
-  9. If QA passes: lead re-dispatches ONLY the previously-failing reviewers as new subagent calls
-  10. If review iteration >= 3: escalate to user
-```
-
-### Dynamic Task Creation (proposal + lead decision)
-
-Teammates do NOT create tasks unilaterally. They propose to the lead:
-
-```
-TASK PROPOSAL: <what> | WHY: <reason> | BLOCKS: <what it gates> | FILES: <affected>
-```
-
-**Decision flow:**
-1. Teammate proposes via message to the lead
-2. Lead evaluates: Does this block progress? Does it conflict with existing tasks/file ownership?
-3. If approved: lead creates task with TaskCreate, sets dependencies, messages relevant teammate
-4. If rejected: lead explains why, work continues on existing tasks
-
-**Fast-track (no proposal needed):**
-- Fix tasks from review ISSUES FOUND (lead creates directly - reviewer is authority)
-
-### Escalation (separate iteration caps per loop)
-
-Each loop has its own iteration budget:
-- **QA loop:** 3 iterations (verifier-driven, covers build/test/lint failures)
-- **Review loop:** 3 iterations (lead-driven, covers security/standards/testing/architecture feedback)
-
-Counters are independent - QA failures do not consume the review budget and vice versa.
-
-On cap, present to user:
-
-```
-## Escalation: [RED/GREEN/BLUE] Phase - Iteration Limit Reached
-
-### Remaining Issues
-[Quality gate output and/or unresolved review feedback]
-
-### Options
-1. Provide guidance and continue
-2. Take over manually
-3. Accept current state and move on
-```
-
-Team stays alive during escalation. User guidance feeds back into the loop. Only shutdown when user explicitly says to stop or all phases complete.
+On cap, present options to user: provide guidance, take over manually, or accept current state.
+Team stays alive during escalation.
 
 ### Lead Interventions
 
-The lead intervenes only for:
-- Review task dispatch (subagents, not teammates)
-- Escalation when QA iteration cap (3) or review iteration cap (3) is hit
-- Writing code as fallback if an implementer is stuck
+- Review dispatch (reviewer teammates, spawned JIT)
+- Escalation at iteration caps
+- Code as fallback if implementer stuck after 2 messages on same issue
 - Task proposal decisions
-- Monitoring TaskList for newly unblocked work
-- Checking TaskList for tasks that appear complete but aren't marked as such (nudge teammate or update status)
+- Monitoring TaskList for unblocked work or stale tasks
 
 ---
 
 ## Phase 5: PR Creation
 
-After all TDD phases complete (or the user accepts current state):
+Shutdown criteria already verified all quality checks pass.
 
-Shutdown criteria already verified `make build/test/lint/test-integration` pass.
+Push the branch and create a PR with this structure:
 
-Prepare the PR:
-
-```bash
-git log --oneline main..HEAD
 ```
-
-### Create PR
-
-```bash
-git push -u origin HEAD
-gh pr create --title "<type>: <description>" --body "$(cat <<'EOF'
 ## Summary
-<1-3 bullet points from the implementation>
+<1-3 bullet points>
 
 ## Test Plan
-- [ ] Unit tests added for new behavior
-- [ ] Positive detection cases covered
-- [ ] Negative (safe) cases covered
-- [ ] Bypass attempt cases covered
+- [ ] Unit tests for new behavior
+- [ ] Positive detection, negative (safe), and bypass cases
 - [ ] Integration tests pass
 
-## Security Considerations
-<security-relevant notes from security review>
-
 ## Review Summary
-- Security: [verdict] (Bypass Resistance: X/10)
+- Security: [verdict]
 - Go Standards: [verdict]
 - Testing: [verdict]
 - Architecture: [verdict]
-- Quality Gate: ALL PASS
 
 Closes #$ARGUMENTS
-EOF
-)"
 ```
 
 ### Team Cleanup
 
-Shut down all teammates, wait for confirmations, then delete the team:
-
-1. Send shutdown requests to all teammates (use the actual names from spawn time):
-   ```
-   SendMessage(type="shutdown_request", recipient="<implementer-name>", content="PR created, shutting down")
-   SendMessage(type="shutdown_request", recipient="<verifier-name>", content="PR created, shutting down")
-   # (repeat for each teammate - use actual names, not placeholders)
-   ```
-
-2. Wait for all shutdown confirmations (delivered automatically via messages).
-   If a teammate rejects, address their concern or resend after their task completes.
-
-3. After all teammates have confirmed and exited:
-   ```
-   TeamDelete()
-   ```
-
-Provide the PR URL to the user.
+1. Send `shutdown_request` to each teammate by name
+2. Wait for confirmations
+3. `TeamDelete()`
+4. Provide the PR URL to the user
 
 ---
 
 ## Error Handling
 
-### Teammate Unresponsive
-1. Check TaskList for their task status
-2. Send a status ping message
-3. If still unresponsive, inform the user
+- **Unresponsive teammate:** Check TaskList, ping, escalate to user if still unresponsive
+- **Repeated QA failures on same target:** Include specific output in escalation. Environmental failures (missing tools) escalate immediately.
+- **Reviewer disagreement:** Reviewers resolve directly via messages. Escalate to lead only if deadlocked.
+- **Lead fallback:** Write the fix directly if implementer stuck after 2 messages on same issue
 
-### QA Repeatedly Fails Same Target
-If the same `make` target fails 3 times, include the specific command output in the escalation. If failures are environmental (missing ffmpeg, chrome), escalate immediately rather than looping.
+### Session Recovery
 
-### Reviewer Disagreement
-If review subagents provide conflicting feedback, flag the conflict when consolidating feedback for the implementer. Include both perspectives.
+Session interruption kills all teammates (`/resume` does not restore them).
 
-### Lead Fallback
-If an implementer is stuck after 2 messages about the same issue, the lead should write the fix directly rather than continuing the loop.
-
-### Session Interruption Recovery
-Session interruption (crash, network loss, manual stop) kills all in-process teammates.
-They cannot be recovered - `/resume` does not restore teammate processes.
-
-**Recovery steps:**
-1. Check TaskList for last-known state (it persists on disk)
-2. Reset any stale `in_progress` tasks to `pending` via TaskUpdate
-3. Spawn fresh teammates to continue from the task graph
-4. The task graph and dependency structure remain intact - new teammates pick up where the old ones left off
+1. Check TaskList (persists on disk) for last-known state
+2. Check if the issue branch exists; if so, switch to it
+3. Reset stale `in_progress` tasks to `pending` via TaskUpdate
+4. Spawn fresh teammates - they pick up from the task graph
 
 ---
 
 ## Quick Reference
 
-**Commit Prefixes:** `test:` (RED), `feat:` (GREEN), `refactor:` (BLUE), `fix:` (iterations)
+**Commit Prefixes:** `test:` (RED), `feat:` (GREEN), `fix:` (iterations), `refactor:` (review fixes)
 
 **Threat Categories:** T1-T9 (technical), S1-S13 (safety/LLM)
 
 **QA Targets:** `make build`, `make test`, `make lint`, `make test-integration`
 
 **Iteration Budget:** 3 per QA loop, 3 per review loop (independent counters)
-
-**Team Sizing:** 2-4 agents based on scope, reviews as subagents
