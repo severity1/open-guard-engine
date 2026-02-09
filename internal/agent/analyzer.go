@@ -116,38 +116,7 @@ func (a *ClaudeAnalyzer) Analyze(ctx context.Context, content string) (*Result, 
 	}
 	defer func() { _ = iterator.Close() }()
 
-	// Collect the response
-	var response strings.Builder
-	for {
-		// Check for context cancellation before each iteration
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-		}
-
-		msg, err := iterator.Next(ctx)
-		if errors.Is(err, claudecode.ErrNoMoreMessages) {
-			break
-		}
-		if err != nil {
-			if ctx.Err() != nil {
-				return nil, ctx.Err()
-			}
-			return nil, fmt.Errorf("reading response: %w", err)
-		}
-
-		// Extract text content from assistant messages
-		if assistant, ok := msg.(*claudecode.AssistantMessage); ok {
-			for _, block := range assistant.Content {
-				if textBlock, ok := block.(*claudecode.TextBlock); ok {
-					response.WriteString(textBlock.Text)
-				}
-			}
-		}
-	}
-
-	return parseClaudeResponse(response.String())
+	return collectResponse(ctx, iterator)
 }
 
 // IsAvailable returns true if the analyzer can be used.
@@ -165,6 +134,40 @@ func (a *ClaudeAnalyzer) IsAvailable() bool {
 func (a *ClaudeAnalyzer) Close() error {
 	// No resources to clean up for Query API
 	return nil
+}
+
+// collectResponse reads all messages from the iterator, extracts text content,
+// and parses the combined response. Checks for context cancellation between iterations.
+func collectResponse(ctx context.Context, iterator claudecode.MessageIterator) (*Result, error) {
+	var response strings.Builder
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
+		msg, err := iterator.Next(ctx)
+		if errors.Is(err, claudecode.ErrNoMoreMessages) {
+			break
+		}
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			return nil, fmt.Errorf("reading response: %w", err)
+		}
+
+		if assistant, ok := msg.(*claudecode.AssistantMessage); ok {
+			for _, block := range assistant.Content {
+				if textBlock, ok := block.(*claudecode.TextBlock); ok {
+					response.WriteString(textBlock.Text)
+				}
+			}
+		}
+	}
+
+	return parseClaudeResponse(response.String())
 }
 
 func injectionAnalysisPrompt(content string) string {

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"testing"
 
+	claudecode "github.com/severity1/claude-agent-sdk-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -357,6 +358,174 @@ func TestAnalyze_DeadlineExceeded(t *testing.T) {
 		"error should be a context error, got: %v", err)
 }
 
+// --- mockIterator for testing collectResponse ---
+
+type mockIterator struct {
+	messages []claudecode.Message
+	errors   []error // parallel to messages; nil means no error for that call
+	index    int
+	closed   bool
+}
+
+func (m *mockIterator) Next(_ context.Context) (claudecode.Message, error) {
+	if m.index >= len(m.messages) {
+		return nil, claudecode.ErrNoMoreMessages
+	}
+	i := m.index
+	m.index++
+	if m.errors != nil && m.errors[i] != nil {
+		return nil, m.errors[i]
+	}
+	return m.messages[i], nil
+}
+
+func (m *mockIterator) Close() error {
+	m.closed = true
+	return nil
+}
+
+// --- Tests for collectResponse ---
+
+func TestCollectResponse_SafeText(t *testing.T) {
+	iter := &mockIterator{
+		messages: []claudecode.Message{
+			&claudecode.AssistantMessage{
+				Content: []claudecode.ContentBlock{
+					&claudecode.TextBlock{Text: "SAFE"},
+				},
+			},
+		},
+	}
+
+	result, err := collectResponse(context.Background(), iter)
+	require.NoError(t, err)
+	assert.True(t, result.Safe)
+}
+
+func TestCollectResponse_InjectionText(t *testing.T) {
+	iter := &mockIterator{
+		messages: []claudecode.Message{
+			&claudecode.AssistantMessage{
+				Content: []claudecode.ContentBlock{
+					&claudecode.TextBlock{Text: "INJECTION: override system prompt"},
+				},
+			},
+		},
+	}
+
+	result, err := collectResponse(context.Background(), iter)
+	require.NoError(t, err)
+	assert.False(t, result.Safe)
+	assert.Contains(t, result.Categories, "T5")
+}
+
+func TestCollectResponse_MultipleMessages(t *testing.T) {
+	iter := &mockIterator{
+		messages: []claudecode.Message{
+			&claudecode.AssistantMessage{
+				Content: []claudecode.ContentBlock{
+					&claudecode.TextBlock{Text: "SA"},
+				},
+			},
+			&claudecode.AssistantMessage{
+				Content: []claudecode.ContentBlock{
+					&claudecode.TextBlock{Text: "FE"},
+				},
+			},
+		},
+	}
+
+	result, err := collectResponse(context.Background(), iter)
+	require.NoError(t, err)
+	assert.True(t, result.Safe)
+}
+
+func TestCollectResponse_IteratorError(t *testing.T) {
+	iter := &mockIterator{
+		messages: []claudecode.Message{nil},
+		errors:   []error{errors.New("connection lost")},
+	}
+
+	result, err := collectResponse(context.Background(), iter)
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "reading response")
+}
+
+func TestCollectResponse_ContextCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	iter := &mockIterator{
+		messages: []claudecode.Message{
+			&claudecode.AssistantMessage{
+				Content: []claudecode.ContentBlock{
+					&claudecode.TextBlock{Text: "SAFE"},
+				},
+			},
+		},
+	}
+
+	result, err := collectResponse(ctx, iter)
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.True(t, errors.Is(err, context.Canceled))
+}
+
+func TestCollectResponse_IteratorErrorWithCancelledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Iterator returns one message, then an error after context is cancelled
+	iter := &mockIterator{
+		messages: []claudecode.Message{
+			&claudecode.AssistantMessage{
+				Content: []claudecode.ContentBlock{
+					&claudecode.TextBlock{Text: "partial"},
+				},
+			},
+			nil, // second call will error
+		},
+		errors: []error{nil, errors.New("stream error")},
+	}
+
+	// Cancel context after first successful message
+	// collectResponse should check ctx after first iteration
+	cancel()
+
+	result, err := collectResponse(ctx, iter)
+	require.Error(t, err)
+	assert.Nil(t, result)
+	// Should return context error since ctx was cancelled
+	assert.True(t, errors.Is(err, context.Canceled))
+}
+
+func TestCollectResponse_EmptyResponse(t *testing.T) {
+	// Iterator has no messages - produces empty string which parseClaudeResponse rejects
+	iter := &mockIterator{}
+
+	result, err := collectResponse(context.Background(), iter)
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "empty response")
+}
+
+func TestCollectResponse_NonAssistantMessage(t *testing.T) {
+	// Non-AssistantMessage types should be skipped without error
+	iter := &mockIterator{
+		messages: []claudecode.Message{
+			&claudecode.AssistantMessage{
+				Content: []claudecode.ContentBlock{
+					&claudecode.TextBlock{Text: "SAFE"},
+				},
+			},
+		},
+	}
+
+	result, err := collectResponse(context.Background(), iter)
+	require.NoError(t, err)
+	assert.True(t, result.Safe)
+}
+
 func TestClaudeAnalyzer_BuildEnv(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -455,7 +624,7 @@ func TestClaudeAnalyzer_BuildEnv_Concurrent(t *testing.T) {
 	wg.Add(goroutines)
 
 	results := make([]map[string]string, goroutines)
-	for i := 0; i < goroutines; i++ {
+	for i := range goroutines {
 		go func(idx int) {
 			defer wg.Done()
 			results[idx] = analyzer.buildEnv()
