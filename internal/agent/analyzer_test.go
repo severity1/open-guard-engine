@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -427,4 +428,84 @@ func TestAnalyze_DeadlineExceeded(t *testing.T) {
 	assert.Nil(t, result)
 	assert.True(t, errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded),
 		"error should be a context error, got: %v", err)
+}
+
+func TestClaudeAnalyzer_BuildEnv(t *testing.T) {
+	tests := []struct {
+		name     string
+		provider string
+		endpoint string
+		wantNil  bool
+		wantEnv  map[string]string
+	}{
+		{
+			name:     "claude provider returns nil",
+			provider: "claude",
+			endpoint: "",
+			wantNil:  true,
+		},
+		{
+			name:     "ollama provider returns env map",
+			provider: "ollama",
+			endpoint: "http://localhost:11434",
+			wantEnv: map[string]string{
+				"ANTHROPIC_BASE_URL":   "http://localhost:11434",
+				"ANTHROPIC_AUTH_TOKEN": "ollama",
+				"ANTHROPIC_API_KEY":    "",
+			},
+		},
+		{
+			name:     "ollama custom endpoint",
+			provider: "ollama",
+			endpoint: "http://custom:8080",
+			wantEnv: map[string]string{
+				"ANTHROPIC_BASE_URL":   "http://custom:8080",
+				"ANTHROPIC_AUTH_TOKEN": "ollama",
+				"ANTHROPIC_API_KEY":    "",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			analyzer := NewClaudeAnalyzer("test-model", ".", tt.provider, tt.endpoint)
+			env := analyzer.buildEnv()
+
+			if tt.wantNil {
+				assert.Nil(t, env)
+				return
+			}
+
+			require.NotNil(t, env)
+			for key, want := range tt.wantEnv {
+				assert.Equal(t, want, env[key], "env key %s", key)
+			}
+		})
+	}
+}
+
+func TestClaudeAnalyzer_BuildEnv_Concurrent(t *testing.T) {
+	analyzer := NewClaudeAnalyzer("test-model", ".", "ollama", "http://localhost:11434")
+
+	const goroutines = 10
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+
+	results := make([]map[string]string, goroutines)
+	for i := 0; i < goroutines; i++ {
+		go func(idx int) {
+			defer wg.Done()
+			results[idx] = analyzer.buildEnv()
+		}(i)
+	}
+
+	wg.Wait()
+
+	// All goroutines should produce identical, correct results
+	for i, env := range results {
+		require.NotNil(t, env, "goroutine %d returned nil", i)
+		assert.Equal(t, "http://localhost:11434", env["ANTHROPIC_BASE_URL"], "goroutine %d", i)
+		assert.Equal(t, "ollama", env["ANTHROPIC_AUTH_TOKEN"], "goroutine %d", i)
+		assert.Equal(t, "", env["ANTHROPIC_API_KEY"], "goroutine %d", i)
+	}
 }
