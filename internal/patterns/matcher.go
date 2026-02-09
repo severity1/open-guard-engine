@@ -3,8 +3,8 @@ package patterns
 
 import (
 	_ "embed"
+	"fmt"
 	"regexp"
-	"strings"
 
 	"github.com/severity1/open-guard-engine/internal/types"
 	"gopkg.in/yaml.v3"
@@ -68,6 +68,14 @@ func NewMatcher() (*Matcher, error) {
 			return nil, err
 		}
 
+		// Validate category and severity at startup
+		if _, err := types.ParseThreatCategory(p.Category); err != nil {
+			return nil, fmt.Errorf("pattern %s: %w", p.ID, err)
+		}
+		if _, err := types.ParseThreatLevel(p.Severity); err != nil {
+			return nil, fmt.Errorf("pattern %s: %w", p.ID, err)
+		}
+
 		cp := CompiledPattern{
 			PatternDef:   p,
 			Regex:        re,
@@ -95,11 +103,19 @@ func (m *Matcher) Match(content string) []MatchResult {
 
 	for _, p := range m.patterns {
 		if p.Regex.MatchString(content) {
+			cat, err := categoryFromString(p.Category)
+			if err != nil {
+				continue // validated at startup, should never happen
+			}
+			sev, err := severityFromString(p.Severity)
+			if err != nil {
+				continue // validated at startup, should never happen
+			}
 			result := MatchResult{
 				PatternID:   p.ID,
 				PatternName: p.Name,
-				Category:    categoryFromString(p.Category),
-				Severity:    severityFromString(p.Severity),
+				Category:    cat,
+				Severity:    sev,
 				Description: p.Description,
 				Extracted:   make(map[string]string),
 			}
@@ -119,45 +135,13 @@ func (m *Matcher) Match(content string) []MatchResult {
 }
 
 // categoryFromString converts a category string to ThreatCategory.
-func categoryFromString(s string) types.ThreatCategory {
-	switch strings.ToUpper(s) {
-	case "T1":
-		return types.ThreatCategoryNetwork
-	case "T2":
-		return types.ThreatCategoryCredentials
-	case "T3":
-		return types.ThreatCategoryInjection
-	case "T4":
-		return types.ThreatCategoryFilesystem
-	case "T5":
-		return types.ThreatCategoryPromptInjection
-	case "T6":
-		return types.ThreatCategoryPrivilege
-	case "T7":
-		return types.ThreatCategoryPersistence
-	case "T8":
-		return types.ThreatCategoryRecon
-	case "T9":
-		return types.ThreatCategoryOutput
-	default:
-		return types.ThreatCategory(s)
-	}
+func categoryFromString(s string) (types.ThreatCategory, error) {
+	return types.ParseThreatCategory(s)
 }
 
 // severityFromString converts a severity string to ThreatLevel.
-func severityFromString(s string) types.ThreatLevel {
-	switch strings.ToLower(s) {
-	case "critical":
-		return types.ThreatLevelCritical
-	case "high":
-		return types.ThreatLevelHigh
-	case "medium":
-		return types.ThreatLevelMedium
-	case "low":
-		return types.ThreatLevelLow
-	default:
-		return types.ThreatLevelNone
-	}
+func severityFromString(s string) (types.ThreatLevel, error) {
+	return types.ParseThreatLevel(s)
 }
 
 // HighestSeverity returns the highest severity from a list of results.

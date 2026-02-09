@@ -100,12 +100,17 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 **Go Patterns:**
 - Constructor functions: `NewTypeName(dependencies)` returning `*TypeName`
 - Type constants with `String()` and JSON marshal/unmarshal methods
+- Parse functions for validation: `ParseTypeName(s)` returns error for invalid values
 - Interfaces defined where consumed, not where implemented
+- Exported interfaces enable external testing and mocking
+- Compile-time interface checks: `var _ Interface = (*Implementation)(nil)`
 - Embedded resources via `//go:embed` for single-binary distribution
 
 **Testing:**
 - Table-driven tests with `testify/assert` and `testify/require`
 - Test files named `*_test.go` adjacent to source
+- Mock implementations in `mock.go` files (e.g., `agent.MockAnalyzer`)
+- Exported interfaces enable dependency injection for testing
 - Integration tests in `tests/integration/` with build tags
 - Use `t.Run()` for subtests, `t.Logf()` for diagnostic output
 
@@ -158,6 +163,8 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 ## Git Insights
 
 **Recent Design Decisions:**
+- Strict validation for ThreatCategory and Config values to fail fast on invalid YAML/config (PR #15)
+- Exported Analyzer interface for external testing and mocking (PR #12)
 - Tool-agnostic pattern matching (not tied to specific tool names)
 - Security isolation for agent analysis to prevent malicious project configs
 - Three-layer detection with short-circuit evaluation for performance

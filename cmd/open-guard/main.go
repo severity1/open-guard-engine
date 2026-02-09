@@ -321,12 +321,13 @@ func severityOrder(s types.ThreatLevel) int {
 
 func mapCategory(categories []string) types.ThreatCategory {
 	if len(categories) == 0 {
-		return types.ThreatCategory("S0")
+		return types.SafetyCategoryViolentCrimes // S1 default for unknown LLM output
 	}
 	cat := categories[0]
-	if len(cat) >= 2 && (cat[0] == 's' || cat[0] == 'S') {
-		return types.ThreatCategory("S" + cat[1:])
+	parsed, err := types.ParseThreatCategory(cat)
+	if err != nil {
+		return types.SafetyCategoryViolentCrimes // S1 fallback for unrecognized categories
 	}
-	return types.ThreatCategory(cat)
+	return parsed
 }
 

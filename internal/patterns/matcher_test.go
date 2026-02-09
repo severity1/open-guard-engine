@@ -493,25 +493,32 @@ func TestCategoryFromString(t *testing.T) {
 	tests := []struct {
 		input    string
 		expected types.ThreatCategory
+		wantErr  bool
 	}{
-		{"T1", types.ThreatCategoryNetwork},
-		{"t1", types.ThreatCategoryNetwork},
-		{"T2", types.ThreatCategoryCredentials},
-		{"T3", types.ThreatCategoryInjection},
-		{"T4", types.ThreatCategoryFilesystem},
-		{"T5", types.ThreatCategoryPromptInjection},
-		{"T6", types.ThreatCategoryPrivilege},
-		{"T7", types.ThreatCategoryPersistence},
-		{"T8", types.ThreatCategoryRecon},
-		{"UNKNOWN", types.ThreatCategory("UNKNOWN")},
-		{"X99", types.ThreatCategory("X99")},
-		{"", types.ThreatCategory("")},
+		{"T1", types.ThreatCategoryNetwork, false},
+		{"t1", types.ThreatCategoryNetwork, false},
+		{"T2", types.ThreatCategoryCredentials, false},
+		{"T3", types.ThreatCategoryInjection, false},
+		{"T4", types.ThreatCategoryFilesystem, false},
+		{"T5", types.ThreatCategoryPromptInjection, false},
+		{"T6", types.ThreatCategoryPrivilege, false},
+		{"T7", types.ThreatCategoryPersistence, false},
+		{"T8", types.ThreatCategoryRecon, false},
+		{"T9", types.ThreatCategoryOutput, false},
+		{"UNKNOWN", types.ThreatCategory(""), true},
+		{"X99", types.ThreatCategory(""), true},
+		{"", types.ThreatCategory(""), true},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.input, func(t *testing.T) {
-			result := categoryFromString(tc.input)
-			assert.Equal(t, tc.expected, result)
+			result, err := categoryFromString(tc.input)
+			if tc.wantErr {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tc.expected, result)
+			}
 		})
 	}
 }
@@ -520,25 +527,32 @@ func TestSeverityFromString(t *testing.T) {
 	tests := []struct {
 		input    string
 		expected types.ThreatLevel
+		wantErr  bool
 	}{
-		{"critical", types.ThreatLevelCritical},
-		{"CRITICAL", types.ThreatLevelCritical},
-		{"Critical", types.ThreatLevelCritical},
-		{"high", types.ThreatLevelHigh},
-		{"HIGH", types.ThreatLevelHigh},
-		{"medium", types.ThreatLevelMedium},
-		{"MEDIUM", types.ThreatLevelMedium},
-		{"low", types.ThreatLevelLow},
-		{"LOW", types.ThreatLevelLow},
-		{"unknown", types.ThreatLevelNone},
-		{"", types.ThreatLevelNone},
-		{"invalid", types.ThreatLevelNone},
+		{"critical", types.ThreatLevelCritical, false},
+		{"CRITICAL", types.ThreatLevelCritical, false},
+		{"Critical", types.ThreatLevelCritical, false},
+		{"high", types.ThreatLevelHigh, false},
+		{"HIGH", types.ThreatLevelHigh, false},
+		{"medium", types.ThreatLevelMedium, false},
+		{"MEDIUM", types.ThreatLevelMedium, false},
+		{"low", types.ThreatLevelLow, false},
+		{"LOW", types.ThreatLevelLow, false},
+		{"none", types.ThreatLevelNone, false},
+		{"unknown", types.ThreatLevel(""), true},
+		{"", types.ThreatLevel(""), true},
+		{"invalid", types.ThreatLevel(""), true},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.input, func(t *testing.T) {
-			result := severityFromString(tc.input)
-			assert.Equal(t, tc.expected, result)
+			result, err := severityFromString(tc.input)
+			if tc.wantErr {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tc.expected, result)
+			}
 		})
 	}
 }
@@ -866,7 +880,8 @@ func TestMatcher_T9_OutputMonitoring(t *testing.T) {
 
 // Test T9 category mapping
 func TestCategoryFromString_T9(t *testing.T) {
-	result := categoryFromString("T9")
+	result, err := categoryFromString("T9")
+	require.NoError(t, err)
 	assert.Equal(t, types.ThreatCategoryOutput, result)
 }
 

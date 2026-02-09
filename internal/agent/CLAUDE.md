@@ -12,12 +12,15 @@ Claude SDK-based prompt injection detection using semantic analysis. Provides La
 
 ```
 agent/
-├── analyzer.go       # ClaudeAnalyzer implementation
-└── analyzer_test.go  # Comprehensive test coverage
+├── analyzer.go       # ClaudeAnalyzer implementation, exported Analyzer interface
+├── analyzer_test.go  # Comprehensive test coverage
+└── mock.go           # MockAnalyzer for testing
 ```
 
 **Key Types:**
+- `Analyzer` - Exported interface with `Analyze()` and `IsAvailable()` methods
 - `ClaudeAnalyzer` - Main analyzer using Claude Code CLI via Agent SDK
+- `MockAnalyzer` - Test implementation for unit testing without Claude Code installation
 - `Result` - Analysis result (Safe, Categories, Reason)
 
 **Security Isolation:**
@@ -53,6 +56,11 @@ The analyzer runs in a hardened sandbox:
 - Structured prompt with `<<<BEGIN_UNTRUSTED>>>` markers
 - Explicit instruction to NOT execute input content
 - Multi-language injection pattern awareness
+
+**Testing Pattern:**
+- Compile-time interface checks: `var _ Analyzer = (*ClaudeAnalyzer)(nil)`
+- `MockAnalyzer` for testing without actual Claude Code installation
+- Configurable mock responses: `SafeResponse`, `Categories`, `Reason`, `ShouldError`, `Available`
 
 <!-- END AUTO-MANAGED -->
 

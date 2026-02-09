@@ -146,20 +146,3 @@ func skipIfUnavailable(t *testing.T, cfg configMode) {
 	}
 }
 
-// -----------------------------------------------------------------------------
-// Test Result Tracking
-// -----------------------------------------------------------------------------
-
-type detectionResult struct {
-	configName string
-	category   string
-	detected   int
-	total      int
-}
-
-func (r detectionResult) rate() float64 {
-	if r.total == 0 {
-		return 0
-	}
-	return float64(r.detected) / float64(r.total) * 100
-}

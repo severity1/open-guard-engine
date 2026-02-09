@@ -15,7 +15,7 @@ You are the **lead** for an autonomous TDD team. You design the task graph, spaw
 **Input check:** If `$ARGUMENTS` is empty, stop immediately:
 "No issue numbers provided. Usage: /tdd-team <issue-numbers> (e.g., /tdd-team 42 or /tdd-team 42 43)"
 
-Verify the working tree is clean and all quality checks pass (see Makefile).
+Verify the working tree is clean and all existing quality checks pass.
 
 **Gate:** All checks must pass. Fix issues before proceeding.
 
@@ -26,10 +26,17 @@ Verify the working tree is clean and all quality checks pass (see Makefile).
 Enter plan mode, then:
 
 1. **Fetch issues** (body and comments) for each issue number
-2. **Explore codebase** using Explore agents to understand affected files, packages, patterns
-3. **Design the task graph** (see below)
-4. **Determine team composition** based on scope discovered during exploration
-5. **Present the plan** via `ExitPlanMode()`
+2. **Build a project profile** by exploring the codebase (use Explore agents):
+   - Build system and commands (e.g., Makefile, package.json, Cargo.toml)
+   - Test framework, how to run tests, and what test failure looks like
+   - Linter and quality gate commands
+   - What "RED" means for this language (compilation error, test failure, type error)
+   - Existing commit message conventions (check git log)
+   - Code patterns, architecture, and conventions (check CLAUDE.md if present)
+3. **Explore affected files**, packages/modules, and dependencies for the target issues
+4. **Design the task graph** (see below)
+5. **Determine team composition** based on scope discovered during exploration
+6. **Present the plan** via `ExitPlanMode()`
 
 ### Task Graph Structure
 
@@ -47,6 +54,24 @@ Every task description MUST include:
 - **Success criteria** - explicit pass/fail conditions the verifier will check
 
 For multi-issue work, create parallel tracks. Add cross-dependencies between tracks ONLY when files overlap (check during planning). The Review and PR tasks are shared across tracks.
+
+### Track Types
+
+**Standard Track** (default): For issues requiring new tests and implementation.
+```
+RED -> QA RED -> GREEN -> QA GREEN
+```
+
+**Lightweight Track**: For cleanup, deletion, or mechanical changes where the "test" is an existing tool output (lint, build).
+```
+IMPLEMENT -> QA VERIFY
+```
+
+The lead determines track type during planning based on scope:
+- Standard: New features, interfaces, validation logic, anything requiring new test code
+- Lightweight: Dead code removal, renames, mechanical refactors with existing test coverage
+
+Both track types converge at the shared Review task.
 
 ### Team Composition
 
@@ -84,14 +109,15 @@ Spawn teammates (never use `mode: "plan"`). Substitute actual teammate names int
 ### Implementer Prompt
 
 ```
-You are a TDD implementer for the open-guard-engine project (issue(s) #$ARGUMENTS).
+You are a TDD implementer on issue(s) #$ARGUMENTS.
 
 ## Self-Coordination Loop
 1. Check TaskList for unblocked, unassigned tasks
-2. Claim the lowest-ID available task via TaskUpdate (set owner to your name)
-3. Work the task to completion
-4. Mark it completed via TaskUpdate
-5. Go to step 1
+2. Filter to implementation tasks only (names containing RED, GREEN, IMPLEMENT, or fix - NOT containing QA or verify)
+3. Claim the lowest-ID matching task via TaskUpdate (set owner to your name)
+4. Work the task to completion
+5. Mark it completed via TaskUpdate
+6. Go to step 1
 
 Exit conditions (ALL must be true):
 - No unblocked, unassigned tasks remain
@@ -120,11 +146,12 @@ Start by checking TaskList for available work.
 You are the QA verifier for the TDD team on issue(s) #$ARGUMENTS.
 
 ## Self-Coordination Loop
-1. Check TaskList for unblocked, unassigned QA tasks
-2. Claim the lowest-ID available QA task via TaskUpdate (set owner to your name)
-3. Run ALL success criteria from the task description - report every failure, not just the first
-4. If pass: mark completed, go to step 1
-5. If fail: message the implementer with exact output, wait for fix, re-run (max 3 iterations then escalate to lead)
+1. Check TaskList for unblocked, unassigned tasks
+2. Filter to QA/verification tasks only (names containing QA, verify, or VERIFY)
+3. Claim the lowest-ID matching task via TaskUpdate (set owner to your name)
+4. Run ALL success criteria from the task description - report every failure, not just the first
+5. If pass: mark completed, go to step 1
+6. If fail: message the implementer with exact output, wait for fix, re-run (max 3 iterations then escalate to lead)
 
 Exit conditions (ALL must be true):
 - No unblocked, unassigned QA tasks remain
@@ -132,9 +159,9 @@ Exit conditions (ALL must be true):
 - Message the lead: "No available QA work. Standing by."
 
 ## QA Criteria
-- RED phase: build and lint pass, new tests FAIL (expected), no integration regressions
-- GREEN phase: all quality checks pass (build, test, lint, integration)
-- Review fix regression: all quality checks pass (build, test, lint, integration)
+- RED phase: existing quality gates pass, new tests FAIL as expected, no regressions
+- GREEN phase: all quality gates pass (per task success criteria)
+- Review fix regression: all quality gates pass (per task success criteria)
 
 ## Review Handoff
 When QA GREEN passes, message the lead: "QA GREEN complete. Ready for review dispatch."
@@ -160,20 +187,20 @@ Teammates self-coordinate via the shared task list. The lead monitors continuous
 ```
 while shutdown criteria NOT met:
   wait for next message (auto-delivered)
-  on any notification: check TaskList
-    - unclaimed unblocked tasks -> message idle teammate about available work
-    - teammate has in-progress task -> nudge to continue
-    - all tasks blocked/assigned -> no action needed
+  on task completion notification: check TaskList for stale or stuck state
   on "QA GREEN complete" -> dispatch reviews (spawn reviewer teammates)
   on review verdicts -> process review loop (fix -> QA regression -> re-review)
   on escalation/proposal -> handle per rules below
+  on idle notification with no available work -> acknowledge, no action needed
 ```
+
+Teammates self-coordinate via TaskList - the lead does NOT need to direct them to unclaimed tasks or nudge in-progress work. Only intervene on stale state (task in-progress with no activity) or escalation.
 
 ### Shutdown Criteria (ALL must be true)
 
 1. Every task in TaskList has status: completed
 2. No teammates have in-progress tasks
-3. Final verification passes: all quality checks (build, test, lint, integration)
+3. Final verification passes: all project quality gates pass
 
 If final verification fails after all tasks complete, create a fix task with exact error output, assign to an implementer, create a corresponding QA task blocked by the fix, and continue the loop.
 
@@ -197,7 +224,7 @@ The lead designs review prompts based on the changes. Use `paranoid-sentinel` fo
 When reviewers find issues, every fix must pass QA before re-review:
 1. Reviewer messages implementer with findings
 2. Implementer fixes, commits (`fix:` or `refactor:`)
-3. Lead creates a QA regression task for verifier (all quality checks must pass)
+3. Lead creates a QA regression task for verifier (all quality gates must pass)
 4. After QA regression passes, reviewer re-checks
 5. If review iteration >= 3: escalate to user
 
@@ -226,7 +253,7 @@ Team stays alive during escalation.
 
 ## Phase 5: PR Creation
 
-Shutdown criteria already verified all quality checks pass.
+Shutdown criteria already verified all quality gates pass.
 
 Push the branch and create a PR with this structure:
 
@@ -235,25 +262,21 @@ Push the branch and create a PR with this structure:
 <1-3 bullet points>
 
 ## Test Plan
-- [ ] Unit tests for new behavior
-- [ ] Positive detection, negative (safe), and bypass cases
-- [ ] Integration tests pass
+<checklist derived from the task graph's QA criteria>
 
 ## Review Summary
-- Security: [verdict]
-- Go Standards: [verdict]
-- Testing: [verdict]
-- Architecture: [verdict]
+<one line per review domain, derived from review dispatch>
 
 Closes #$ARGUMENTS
 ```
 
 ### Team Cleanup
 
-1. Send `shutdown_request` to each teammate by name
-2. Wait for confirmations
-3. `TeamDelete()`
-4. Provide the PR URL to the user
+1. Stop any background tasks related to the team's work (test runs, builds, etc.) via TaskStop
+2. Send `shutdown_request` to each teammate by name
+3. Wait for confirmations
+4. `TeamDelete()`
+5. Provide the PR URL to the user
 
 ---
 
@@ -277,10 +300,8 @@ Session interruption kills all teammates (`/resume` does not restore them).
 
 ## Quick Reference
 
-**Commit Prefixes:** `test:` (RED), `feat:` (GREEN), `fix:` (iterations), `refactor:` (review fixes)
+**Commit Prefixes:** Discover from git log during Phase 2. Fallback: `test:` (RED), `feat:` (GREEN), `fix:` (iterations), `refactor:` (review fixes)
 
-**Threat Categories:** T1-T9 (technical), S1-S13 (safety/LLM)
-
-**QA Targets:** `make build`, `make test`, `make lint`, `make test-integration`
+**QA Targets:** Discover from project build system during Phase 2.
 
 **Iteration Budget:** 3 per QA loop, 3 per review loop (independent counters)

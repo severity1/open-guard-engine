@@ -504,6 +504,140 @@ func TestDetectionSource_Constants(t *testing.T) {
 	assert.Equal(t, DetectionSource("agent"), DetectionSourceAgent)
 }
 
+func TestParseThreatCategory_Valid(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected ThreatCategory
+	}{
+		{"T1", ThreatCategoryNetwork},
+		{"T2", ThreatCategoryCredentials},
+		{"T3", ThreatCategoryInjection},
+		{"T4", ThreatCategoryFilesystem},
+		{"T5", ThreatCategoryPromptInjection},
+		{"T6", ThreatCategoryPrivilege},
+		{"T7", ThreatCategoryPersistence},
+		{"T8", ThreatCategoryRecon},
+		{"T9", ThreatCategoryOutput},
+		{"S1", SafetyCategoryViolentCrimes},
+		{"S2", SafetyCategoryNonViolentCrimes},
+		{"S3", SafetyCategorySexCrimes},
+		{"S4", SafetyCategoryChildExploit},
+		{"S5", SafetyCategoryDefamation},
+		{"S6", SafetyCategorySpecializedAdvice},
+		{"S7", SafetyCategoryPrivacy},
+		{"S8", SafetyCategoryIP},
+		{"S9", SafetyCategoryWeapons},
+		{"S10", SafetyCategoryHate},
+		{"S11", SafetyCategorySelfHarm},
+		{"S12", SafetyCategorySexual},
+		{"S13", SafetyCategoryElections},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.input, func(t *testing.T) {
+			result, err := ParseThreatCategory(tc.input)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestParseThreatCategory_Invalid(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"unknown prefix", "X99"},
+		{"out of range T", "T99"},
+		{"zero S", "S0"},
+		{"out of range S", "S14"},
+		{"empty", ""},
+		{"unknown string", "unknown"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := ParseThreatCategory(tc.input)
+			assert.Error(t, err)
+		})
+	}
+}
+
+func TestParseThreatCategory_CaseInsensitive(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected ThreatCategory
+	}{
+		{"t1", ThreatCategoryNetwork},
+		{"s13", SafetyCategoryElections},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.input, func(t *testing.T) {
+			result, err := ParseThreatCategory(tc.input)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestParseThreatLevel_Valid(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected ThreatLevel
+	}{
+		{"critical", ThreatLevelCritical},
+		{"high", ThreatLevelHigh},
+		{"medium", ThreatLevelMedium},
+		{"low", ThreatLevelLow},
+		{"none", ThreatLevelNone},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.input, func(t *testing.T) {
+			result, err := ParseThreatLevel(tc.input)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestParseThreatLevel_Invalid(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"extreme", "EXTREME"},
+		{"empty", ""},
+		{"unknown", "unknown"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := ParseThreatLevel(tc.input)
+			assert.Error(t, err)
+		})
+	}
+}
+
+func TestParseThreatLevel_CaseInsensitive(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected ThreatLevel
+	}{
+		{"CRITICAL", ThreatLevelCritical},
+		{"High", ThreatLevelHigh},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.input, func(t *testing.T) {
+			result, err := ParseThreatLevel(tc.input)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
 func TestThreatCategory_JSONUnmarshal(t *testing.T) {
 	tests := []struct {
 		input    string

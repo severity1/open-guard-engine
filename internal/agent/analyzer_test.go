@@ -77,13 +77,65 @@ func TestClaudeAnalyzer_IsAvailable(t *testing.T) {
 }
 
 func TestClaudeAnalyzer_Interface(t *testing.T) {
-	// Verify ClaudeAnalyzer implements the expected interface
-	type Analyzer interface {
-		Analyze(ctx context.Context, content string) (*Result, error)
-		IsAvailable() bool
+	// Verify ClaudeAnalyzer implements the exported Analyzer interface
+	var _ Analyzer = (*ClaudeAnalyzer)(nil)
+}
+
+func TestMockAnalyzer_Analyze(t *testing.T) {
+	tests := []struct {
+		name           string
+		mock           MockAnalyzer
+		wantSafe       bool
+		wantCategories []string
+		wantReason     string
+		wantErr        bool
+	}{
+		{
+			name:     "safe response",
+			mock:     MockAnalyzer{SafeResponse: true},
+			wantSafe: true,
+		},
+		{
+			name:           "unsafe response with categories and reason",
+			mock:           MockAnalyzer{SafeResponse: false, Categories: []string{"T5"}, Reason: "injection detected"},
+			wantSafe:       false,
+			wantCategories: []string{"T5"},
+			wantReason:     "injection detected",
+		},
+		{
+			name:    "error case",
+			mock:    MockAnalyzer{ShouldError: true},
+			wantErr: true,
+		},
 	}
 
-	var _ Analyzer = (*ClaudeAnalyzer)(nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := tt.mock.Analyze(context.Background(), "test content")
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, result)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			assert.Equal(t, tt.wantSafe, result.Safe)
+			assert.Equal(t, tt.wantCategories, result.Categories)
+			assert.Equal(t, tt.wantReason, result.Reason)
+		})
+	}
+}
+
+func TestMockAnalyzer_IsAvailable(t *testing.T) {
+	t.Run("available true", func(t *testing.T) {
+		mock := MockAnalyzer{Available: true}
+		assert.True(t, mock.IsAvailable())
+	})
+
+	t.Run("available false", func(t *testing.T) {
+		mock := MockAnalyzer{Available: false}
+		assert.False(t, mock.IsAvailable())
+	})
 }
 
 func TestNewClaudeAnalyzer(t *testing.T) {

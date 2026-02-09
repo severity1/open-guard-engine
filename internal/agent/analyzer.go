@@ -20,6 +20,15 @@ type Result struct {
 	Reason     string
 }
 
+// Analyzer defines the interface for prompt injection analysis.
+type Analyzer interface {
+	Analyze(ctx context.Context, content string) (*Result, error)
+	IsAvailable() bool
+}
+
+// Compile-time interface satisfaction check.
+var _ Analyzer = (*ClaudeAnalyzer)(nil)
+
 // ClaudeAnalyzer detects prompt injection using Claude Code via the Agent SDK.
 // Supports two providers: "claude" (Anthropic API) or "ollama" (local models).
 type ClaudeAnalyzer struct {

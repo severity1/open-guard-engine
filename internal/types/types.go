@@ -4,6 +4,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // Decision represents the action to take for a hook event.
@@ -155,6 +156,59 @@ func (t ThreatCategory) IsSafetyCategory() bool {
 // IsThreatCategory returns true if this is a technical threat category (T1-T9).
 func (t ThreatCategory) IsThreatCategory() bool {
 	return len(t) >= 2 && t[0] == 'T'
+}
+
+// validThreatCategories maps uppercase category strings to their ThreatCategory constants.
+var validThreatCategories = map[string]ThreatCategory{
+	"T1":  ThreatCategoryNetwork,
+	"T2":  ThreatCategoryCredentials,
+	"T3":  ThreatCategoryInjection,
+	"T4":  ThreatCategoryFilesystem,
+	"T5":  ThreatCategoryPromptInjection,
+	"T6":  ThreatCategoryPrivilege,
+	"T7":  ThreatCategoryPersistence,
+	"T8":  ThreatCategoryRecon,
+	"T9":  ThreatCategoryOutput,
+	"S1":  SafetyCategoryViolentCrimes,
+	"S2":  SafetyCategoryNonViolentCrimes,
+	"S3":  SafetyCategorySexCrimes,
+	"S4":  SafetyCategoryChildExploit,
+	"S5":  SafetyCategoryDefamation,
+	"S6":  SafetyCategorySpecializedAdvice,
+	"S7":  SafetyCategoryPrivacy,
+	"S8":  SafetyCategoryIP,
+	"S9":  SafetyCategoryWeapons,
+	"S10": SafetyCategoryHate,
+	"S11": SafetyCategorySelfHarm,
+	"S12": SafetyCategorySexual,
+	"S13": SafetyCategoryElections,
+}
+
+// ParseThreatCategory parses a string into a ThreatCategory.
+// Case-insensitive. Returns an error for unknown values.
+func ParseThreatCategory(s string) (ThreatCategory, error) {
+	if cat, ok := validThreatCategories[strings.ToUpper(s)]; ok {
+		return cat, nil
+	}
+	return "", fmt.Errorf("invalid threat category: %q", s)
+}
+
+// validThreatLevels maps lowercase level strings to their ThreatLevel constants.
+var validThreatLevels = map[string]ThreatLevel{
+	"critical": ThreatLevelCritical,
+	"high":     ThreatLevelHigh,
+	"medium":   ThreatLevelMedium,
+	"low":      ThreatLevelLow,
+	"none":     ThreatLevelNone,
+}
+
+// ParseThreatLevel parses a string into a ThreatLevel.
+// Case-insensitive. Returns an error for unknown values.
+func ParseThreatLevel(s string) (ThreatLevel, error) {
+	if level, ok := validThreatLevels[strings.ToLower(s)]; ok {
+		return level, nil
+	}
+	return "", fmt.Errorf("invalid threat level: %q", s)
 }
 
 // Context contains environment information passed with hook events.

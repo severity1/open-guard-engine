@@ -48,6 +48,11 @@ types/
 - `String()` method for display
 - `MarshalJSON()`/`UnmarshalJSON()` for serialization
 
+**Validation:**
+- `ParseThreatCategory(s)` - Parse and validate category strings (case-insensitive, returns error for invalid)
+- `ParseThreatLevel(s)` - Parse and validate severity levels (case-insensitive, returns error for invalid)
+- Validation performed at startup in pattern matcher to fail fast on invalid YAML
+
 **Category Helpers:**
 - `Description()` - Human-readable description
 - `IsSafetyCategory()` - Check if S1-S13

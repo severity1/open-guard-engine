@@ -278,12 +278,12 @@ func TestMapCategory(t *testing.T) {
 		categories []string
 		expected   types.ThreatCategory
 	}{
-		{"empty categories", []string{}, types.ThreatCategory("S0")},
-		{"single S category", []string{"S1"}, types.ThreatCategory("S1")},
-		{"lowercase s", []string{"s5"}, types.ThreatCategory("S5")},
-		{"multiple categories", []string{"S1", "S5", "S10"}, types.ThreatCategory("S1")},
-		{"non-S category", []string{"T5"}, types.ThreatCategory("T5")},
-		{"mixed category", []string{"X99"}, types.ThreatCategory("X99")},
+		{"empty categories", []string{}, types.SafetyCategoryViolentCrimes},
+		{"single S category", []string{"S1"}, types.SafetyCategoryViolentCrimes},
+		{"lowercase s", []string{"s5"}, types.SafetyCategoryDefamation},
+		{"multiple categories", []string{"S1", "S5", "S10"}, types.SafetyCategoryViolentCrimes},
+		{"non-S category", []string{"T5"}, types.ThreatCategoryPromptInjection},
+		{"unknown category", []string{"X99"}, types.SafetyCategoryViolentCrimes},
 	}
 
 	for _, tc := range tests {
