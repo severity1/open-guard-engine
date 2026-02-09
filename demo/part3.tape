@@ -3,7 +3,7 @@ Output demo/part3.webm
 
 Set Shell "bash"
 Set FontSize 14
-Set Width 1000
+Set Width 1400
 Set Height 500
 Set Framerate 15
 Set Theme "Catppuccin Mocha"
