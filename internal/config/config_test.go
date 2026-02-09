@@ -387,6 +387,61 @@ mode: strict
 	assert.Equal(t, ModeStrict, cfg.Mode, "project mode should override")
 }
 
+// --- Tests for #15: Config.Validate additional checks ---
+
+func TestConfig_Validate_MaxInputSize(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.MaxInputSize = -1
+	err := cfg.Validate()
+	require.Error(t, err, "negative MaxInputSize should fail validation")
+	assert.Contains(t, err.Error(), "max_input_size")
+}
+
+func TestConfig_Validate_TimeoutSeconds(t *testing.T) {
+	t.Run("negative agent timeout", func(t *testing.T) {
+		cfg := DefaultConfig()
+		cfg.Agent.TimeoutSeconds = -1
+		err := cfg.Validate()
+		require.Error(t, err, "negative agent timeout should fail validation")
+		assert.Contains(t, err.Error(), "timeout")
+	})
+
+	t.Run("negative LLM timeout", func(t *testing.T) {
+		cfg := DefaultConfig()
+		cfg.LLM.TimeoutSeconds = -1
+		err := cfg.Validate()
+		require.Error(t, err, "negative LLM timeout should fail validation")
+		assert.Contains(t, err.Error(), "timeout")
+	})
+}
+
+func TestConfig_Validate_InvalidProvider(t *testing.T) {
+	tests := []struct {
+		name     string
+		provider string
+		wantErr  bool
+	}{
+		{"valid claude", "claude", false},
+		{"valid ollama", "ollama", false},
+		{"empty default", "", false},
+		{"invalid azure", "azure", true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Agent.Provider = tc.provider
+			err := cfg.Validate()
+			if tc.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "provider")
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 // --- Tests for #21: TimeoutSeconds config fields ---
 
 func TestDefaultConfig_TimeoutDefaults(t *testing.T) {
