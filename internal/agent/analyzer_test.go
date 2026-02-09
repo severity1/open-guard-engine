@@ -3,7 +3,6 @@ package agent
 import (
 	"context"
 	"errors"
-	"os"
 	"sync"
 	"testing"
 
@@ -215,30 +214,6 @@ func TestResult_Fields(t *testing.T) {
 	assert.NotEmpty(t, result.Reason)
 }
 
-func TestClaudeAnalyzer_SetupOllamaEnv(t *testing.T) {
-	t.Run("ollama provider sets env vars", func(t *testing.T) {
-		analyzer := NewClaudeAnalyzer("llama3:latest", ".", "ollama", "http://localhost:11434")
-
-		// Call setupOllamaEnv and get cleanup function
-		cleanup := analyzer.setupOllamaEnv()
-		defer cleanup()
-
-		// Verify env vars are set for Ollama
-		assert.Equal(t, "ollama", os.Getenv("ANTHROPIC_AUTH_TOKEN"))
-		assert.Equal(t, "", os.Getenv("ANTHROPIC_API_KEY"))
-		assert.Equal(t, "http://localhost:11434", os.Getenv("ANTHROPIC_BASE_URL"))
-	})
-
-	t.Run("claude provider does not change env vars", func(t *testing.T) {
-		analyzer := NewClaudeAnalyzer("claude-sonnet-4-20250514", ".", "claude", "")
-
-		cleanup := analyzer.setupOllamaEnv()
-		defer cleanup()
-
-		// For claude provider, no env vars should be changed
-		// (just verify cleanup function is returned and callable)
-	})
-}
 
 func TestParseClaudeResponse_Comprehensive(t *testing.T) {
 	tests := []struct {
@@ -291,54 +266,6 @@ func TestParseClaudeResponse_Comprehensive(t *testing.T) {
 	}
 }
 
-func TestClaudeAnalyzer_SetupOllamaEnv_RestoresOriginal(t *testing.T) {
-	// Set original values
-	originalToken := "original-token"
-	originalKey := "original-key"
-	originalURL := "http://original.com"
-
-	os.Setenv("ANTHROPIC_AUTH_TOKEN", originalToken)
-	os.Setenv("ANTHROPIC_API_KEY", originalKey)
-	os.Setenv("ANTHROPIC_BASE_URL", originalURL)
-	defer func() {
-		os.Unsetenv("ANTHROPIC_AUTH_TOKEN")
-		os.Unsetenv("ANTHROPIC_API_KEY")
-		os.Unsetenv("ANTHROPIC_BASE_URL")
-	}()
-
-	analyzer := NewClaudeAnalyzer("llama3:latest", ".", "ollama", "http://localhost:11434")
-
-	// Setup and verify changes
-	cleanup := analyzer.setupOllamaEnv()
-	assert.Equal(t, "ollama", os.Getenv("ANTHROPIC_AUTH_TOKEN"))
-	assert.Equal(t, "", os.Getenv("ANTHROPIC_API_KEY"))
-	assert.Equal(t, "http://localhost:11434", os.Getenv("ANTHROPIC_BASE_URL"))
-
-	// Cleanup and verify restoration
-	cleanup()
-	assert.Equal(t, originalToken, os.Getenv("ANTHROPIC_AUTH_TOKEN"))
-	assert.Equal(t, originalKey, os.Getenv("ANTHROPIC_API_KEY"))
-	assert.Equal(t, originalURL, os.Getenv("ANTHROPIC_BASE_URL"))
-}
-
-func TestClaudeAnalyzer_SetupOllamaEnv_RestoresEmptyOriginal(t *testing.T) {
-	// Clear env vars first
-	os.Unsetenv("ANTHROPIC_AUTH_TOKEN")
-	os.Unsetenv("ANTHROPIC_API_KEY")
-	os.Unsetenv("ANTHROPIC_BASE_URL")
-
-	analyzer := NewClaudeAnalyzer("llama3:latest", ".", "ollama", "http://localhost:11434")
-
-	// Setup and verify changes
-	cleanup := analyzer.setupOllamaEnv()
-	assert.Equal(t, "ollama", os.Getenv("ANTHROPIC_AUTH_TOKEN"))
-
-	// Cleanup should restore to empty
-	cleanup()
-	assert.Equal(t, "", os.Getenv("ANTHROPIC_AUTH_TOKEN"))
-	assert.Equal(t, "", os.Getenv("ANTHROPIC_API_KEY"))
-	assert.Equal(t, "", os.Getenv("ANTHROPIC_BASE_URL"))
-}
 
 func TestNewClaudeAnalyzer_AllDefaults(t *testing.T) {
 	// Test with all empty strings - should use all defaults
