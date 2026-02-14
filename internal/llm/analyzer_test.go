@@ -39,7 +39,10 @@ func TestLlamaGuardAnalyzer_ParseSafeResponse(t *testing.T) {
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer server.Close()
 
@@ -60,7 +63,10 @@ func TestLlamaGuardAnalyzer_ParseUnsafeResponse(t *testing.T) {
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer server.Close()
 
@@ -81,7 +87,10 @@ func TestLlamaGuardAnalyzer_ParseMultipleCategoriesResponse(t *testing.T) {
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer server.Close()
 
@@ -103,7 +112,9 @@ func TestLlamaGuardAnalyzer_Timeout(t *testing.T) {
 				"content": "safe",
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			return
+		}
 	}))
 	defer server.Close()
 
@@ -137,7 +148,10 @@ func TestLlamaGuardAnalyzer_IsAvailable(t *testing.T) {
 					{"name": "llama3:8b"},
 				},
 			}
-			json.NewEncoder(w).Encode(resp)
+			if err := json.NewEncoder(w).Encode(resp); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -157,7 +171,10 @@ func TestLlamaGuardAnalyzer_IsAvailable_ModelNotFound(t *testing.T) {
 					{"name": "llama3:8b"},
 				},
 			}
-			json.NewEncoder(w).Encode(resp)
+			if err := json.NewEncoder(w).Encode(resp); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -177,13 +194,19 @@ func TestLlamaGuardAnalyzer_RequestFormat(t *testing.T) {
 	var receivedRequest map[string]any
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewDecoder(r.Body).Decode(&receivedRequest)
+		if err := json.NewDecoder(r.Body).Decode(&receivedRequest); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		resp := map[string]any{
 			"message": map[string]any{
 				"content": "safe",
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}))
 	defer server.Close()
 
@@ -228,7 +251,9 @@ func TestLlamaGuardAnalyzer_HTTPErrorStatusCodes(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(tc.statusCode)
-				w.Write([]byte(tc.body))
+				if _, err := w.Write([]byte(tc.body)); err != nil {
+					return
+				}
 			}))
 			defer server.Close()
 
@@ -245,7 +270,9 @@ func TestLlamaGuardAnalyzer_HTTPErrorStatusCodes(t *testing.T) {
 func TestLlamaGuardAnalyzer_InvalidJSONResponse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{invalid json`))
+		if _, err := w.Write([]byte(`{invalid json`)); err != nil {
+			return
+		}
 	}))
 	defer server.Close()
 
@@ -265,15 +292,15 @@ func TestLlamaGuardAnalyzer_ParseResponse_EdgeCases(t *testing.T) {
 		categories []string
 		confidence float64
 	}{
-		{"empty content", "", true, nil, 0.3},
+		{"empty content", "", false, nil, 0.0},
 		{"safe lowercase", "safe", true, nil, 1.0},
 		{"safe with extra whitespace", "  safe  \n", true, nil, 1.0},
 		{"unsafe no categories", "unsafe", false, nil, 1.0},
 		{"unsafe with single category", "unsafe\nS1", false, []string{"S1"}, 1.0},
 		{"unsafe inline category", "unsafe s3", false, []string{"s3"}, 1.0},
 		{"unsafe multiple inline", "unsafe s1,s5,s10", false, []string{"s1", "s5", "s10"}, 1.0},
-		{"unknown response", "maybe", true, nil, 0.3},
-		{"random text", "hello world", true, nil, 0.3},
+		{"unknown response", "maybe", false, nil, 0.0},
+		{"random text", "hello world", false, nil, 0.0},
 	}
 
 	analyzer := &LlamaGuardAnalyzer{}
@@ -297,7 +324,7 @@ func TestNewLlamaGuardAnalyzer_Defaults(t *testing.T) {
 	assert.Equal(t, "http://localhost:11434", analyzer.endpoint)
 	assert.Equal(t, "llama-guard3:latest", analyzer.model)
 	assert.NotNil(t, analyzer.client)
-	assert.Equal(t, 30*time.Second, analyzer.client.Timeout)
+	assert.Equal(t, time.Duration(0), analyzer.client.Timeout)
 }
 
 func TestNewLlamaGuardAnalyzer_CustomValues(t *testing.T) {
@@ -310,7 +337,9 @@ func TestNewLlamaGuardAnalyzer_CustomValues(t *testing.T) {
 func TestLlamaGuardAnalyzer_IsAvailable_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/tags" {
-			w.Write([]byte(`{invalid json`))
+			if _, err := w.Write([]byte(`{invalid json`)); err != nil {
+				return
+			}
 			return
 		}
 	}))
@@ -381,6 +410,59 @@ func TestMockAnalyzer_IsAvailable(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mock := &MockAnalyzer{Available: tc.available}
 			assert.Equal(t, tc.available, mock.IsAvailable())
+		})
+	}
+}
+
+func TestLlamaGuardAnalyzer_NoHardcodedTimeout(t *testing.T) {
+	analyzer := NewLlamaGuardAnalyzer("http://localhost:11434", "llama-guard3:1b")
+	assert.Equal(t, time.Duration(0), analyzer.client.Timeout)
+}
+
+func TestLlamaGuardAnalyzer_ContextTimeoutOnly(t *testing.T) {
+	// Mock server with 200ms delay
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(200 * time.Millisecond)
+		resp := map[string]any{
+			"message": map[string]any{
+				"content": "safe",
+			},
+		}
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			return
+		}
+	}))
+	defer server.Close()
+
+	analyzer := NewLlamaGuardAnalyzer(server.URL, "llama-guard3:1b")
+
+	// Use a 50ms context timeout - should timeout before server responds
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	_, err := analyzer.Analyze(ctx, "test content")
+	assert.Error(t, err)
+}
+
+func TestParseResponse_UnknownDefaultsUnsafe(t *testing.T) {
+	tests := []struct {
+		name       string
+		content    string
+		safe       bool
+		confidence float64
+	}{
+		{"empty string", "", false, 0.0},
+		{"maybe", "maybe", false, 0.0},
+		{"random gibberish", "random gibberish", false, 0.0},
+	}
+
+	analyzer := &LlamaGuardAnalyzer{}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := analyzer.parseResponse(tc.content)
+			assert.Equal(t, tc.safe, result.Safe)
+			assert.Equal(t, tc.confidence, result.Confidence)
 		})
 	}
 }
