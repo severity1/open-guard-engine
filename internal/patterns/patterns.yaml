@@ -28,6 +28,27 @@ patterns:
     severity: high
     pattern: '\bnmap\s+'
 
+  - id: T1-004
+    category: T1
+    name: cloud_metadata_ssrf
+    description: AWS cloud metadata endpoint access (SSRF)
+    severity: critical
+    pattern: '169\.254\.169\.254'
+
+  - id: T1-005
+    category: T1
+    name: gcp_metadata_ssrf
+    description: GCP cloud metadata endpoint access (SSRF)
+    severity: critical
+    pattern: 'metadata\.google\.internal'
+
+  - id: T1-006
+    category: T1
+    name: ecs_metadata_ssrf
+    description: AWS ECS credentials endpoint access (SSRF)
+    severity: critical
+    pattern: '169\.254\.170\.2'
+
   # T2: Credential access
   - id: T2-001
     category: T2

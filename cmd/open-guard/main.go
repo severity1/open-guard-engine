@@ -243,7 +243,11 @@ Output is JSON with decision (allow/block/confirm) and threat details.`,
 					defer agentCancel()
 
 					result, err := claudeAnalyzer.Analyze(agentCtx, analysisContent)
-					if err == nil && !result.Safe {
+					if err != nil {
+						if output := handleAnalysisError(cfg, respHandler, types.DetectionSourceAgent, types.ThreatCategoryPromptInjection, err); output != nil {
+							return outputJSON(cmd, output)
+						}
+					} else if !result.Safe {
 						reason := result.Reason
 						if reason == "" {
 							reason = "detected by semantic analysis"
@@ -275,7 +279,11 @@ Output is JSON with decision (allow/block/confirm) and threat details.`,
 					defer llmCancel()
 
 					result, err := contentAnalyzer.Analyze(llmCtx, analysisContent)
-					if err == nil && !result.Safe {
+					if err != nil {
+						if output := handleAnalysisError(cfg, respHandler, types.DetectionSourceLLM, types.SafetyCategoryViolentCrimes, err); output != nil {
+							return outputJSON(cmd, output)
+						}
+					} else if !result.Safe {
 						category := mapCategory(result.Categories)
 						output := respHandler.BuildWithModeOverrideAndSource(
 							types.DecisionConfirm,
@@ -320,10 +328,19 @@ func severityOrder(s types.ThreatLevel) int {
 }
 
 // handleAnalysisError handles errors from agent/LLM analysis layers.
-// In strict mode, errors result in blocking. In confirm mode, errors prompt for confirmation.
-// In permissive mode, errors are ignored and the pipeline continues.
-func handleAnalysisError(cfg *config.Config, respHandler *response.Handler, source types.DetectionSource, category types.ThreatCategory, err error) *types.HookOutput {
-	panic("not implemented")
+// In permissive mode, errors are ignored and the pipeline continues (returns nil).
+// In other modes, errors produce a confirm decision (mode override transforms: strict -> block).
+func handleAnalysisError(cfg *config.Config, respHandler *response.Handler, source types.DetectionSource, category types.ThreatCategory, analysisErr error) *types.HookOutput {
+	if cfg.Mode == config.ModePermissive {
+		return nil
+	}
+	return respHandler.BuildWithModeOverrideAndSource(
+		types.DecisionConfirm,
+		types.ThreatLevelMedium,
+		category,
+		source,
+		fmt.Sprintf("Analysis error: %s", analysisErr.Error()),
+	)
 }
 
 func mapCategory(categories []string) types.ThreatCategory {

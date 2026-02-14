@@ -3,6 +3,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -87,6 +88,28 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid agent provider: %q (must be claude or ollama)", c.Agent.Provider)
 	}
 
+	if err := validateEndpoint(c.LLM.Endpoint, "llm.endpoint"); err != nil {
+		return err
+	}
+	if err := validateEndpoint(c.Agent.Endpoint, "agent.endpoint"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateEndpoint checks that an endpoint URL is empty or uses http/https scheme.
+func validateEndpoint(endpoint, fieldName string) error {
+	if endpoint == "" {
+		return nil
+	}
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return fmt.Errorf("invalid %s endpoint: %w", fieldName, err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("invalid %s endpoint: scheme must be http or https, got %q", fieldName, u.Scheme)
+	}
 	return nil
 }
 
