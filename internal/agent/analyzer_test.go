@@ -509,23 +509,6 @@ func TestCollectResponse_EmptyResponse(t *testing.T) {
 	assert.Contains(t, err.Error(), "empty response")
 }
 
-func TestCollectResponse_NonAssistantMessage(t *testing.T) {
-	// Non-AssistantMessage types should be skipped without error
-	iter := &mockIterator{
-		messages: []claudecode.Message{
-			&claudecode.AssistantMessage{
-				Content: []claudecode.ContentBlock{
-					&claudecode.TextBlock{Text: "SAFE"},
-				},
-			},
-		},
-	}
-
-	result, err := collectResponse(context.Background(), iter)
-	require.NoError(t, err)
-	assert.True(t, result.Safe)
-}
-
 func TestClaudeAnalyzer_BuildEnv(t *testing.T) {
 	tests := []struct {
 		name     string
