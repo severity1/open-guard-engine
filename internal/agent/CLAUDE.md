@@ -40,8 +40,9 @@ The analyzer runs in a hardened sandbox:
 
 **Provider Pattern:**
 - `provider` field: `"claude"` (default) or `"ollama"`
-- Ollama env vars passed to subprocess via `buildEnv()` and `claudecode.WithEnv()`
-- Returns env map for subprocess, not parent process mutation (avoids race conditions)
+- `buildEnv()` always unsets `CLAUDECODE` env var to enable nested SDK invocation from Claude Code hooks/plugins (#102)
+- Ollama provider additionally sets `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_API_KEY`
+- Returns new env map each call for subprocess isolation (avoids race conditions)
 
 **Context & Timeout Handling:**
 - `Analyze()` accepts context for timeout and cancellation

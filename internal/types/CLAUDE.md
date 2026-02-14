@@ -32,6 +32,7 @@ types/
 **ThreatCategory** - Type of threat:
 - `T1`-`T9`: Technical security (pattern-detected)
 - `S1`-`S13`: Content safety (LLM-detected)
+- `unknown`: Analysis unavailable or unclassified (used when LLM analysis fails)
 
 **DetectionSource** - Which layer detected:
 - `pattern`, `llm`, `agent`

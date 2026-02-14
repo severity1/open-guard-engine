@@ -6,7 +6,7 @@
 Defense-in-depth security engine for AI coding assistants. Protects codebases from prompt injection, malicious commands, and harmful content through layered detection: fast pattern matching, agent-based analysis, and LLM content safety.
 
 **Key Features:**
-- 96 threat patterns (T1-T9) with regex matching
+- 97 threat patterns (T1-T9) with regex matching
 - Claude SDK integration for semantic injection detection (T5)
 - Ollama llama-guard3 for content safety (S1-S13)
 - Encoding detection (base64, hex, ROT13, Unicode homoglyphs, fullwidth/NFKC, recursive decoding)
@@ -70,7 +70,7 @@ open-guard-engine/
 **Detection Pipeline (layered, short-circuit on match):**
 ```
 stdin -> Layer 0: Encoding Detection (decode obfuscated content)
-      -> Layer 1: Pattern Matching (fast, deterministic, 96 patterns)
+      -> Layer 1: Pattern Matching (fast, deterministic, 97 patterns)
       -> Layer 2: Agent Analysis (Claude SDK semantic detection)
       -> Layer 3: LLM Safety (llama-guard3 content classification)
       -> stdout: JSON decision
@@ -81,7 +81,7 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 2. Config loaded via --config flag or auto-discovery (project > global > defaults)
 3. Input size validated against config's MaxInputSize (may be stricter than hardcoded limit)
 4. Encoding detector decodes obfuscated content (base64, hex, etc.)
-5. Pattern matcher checks against 96 compiled regex patterns
+5. Pattern matcher checks against 97 compiled regex patterns
 6. If no match and agent enabled, Claude analyzes with timeout and context cancellation
 7. If agent/LLM errors occur, handleAnalysisError applies mode-aware handling (permissive: continue, others: confirm)
 8. If safe and LLM enabled, llama-guard3 classifies content safety
@@ -174,6 +174,7 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 - Extracted collectResponse() for testability and improved context cancellation handling (PR #4)
 - Race condition fix: replaced setupOllamaEnv (parent env mutation) with buildEnv (subprocess env map) to eliminate shared state mutation (PR #8)
 - buildEnv() returns new map each call to ensure concurrent access safety and isolation
+- buildEnv() always unsets CLAUDECODE env var to enable nested SDK invocation from Claude Code hooks/plugins (#102)
 - Strict validation for ThreatCategory and Config values to fail fast on invalid YAML/config (PR #15)
 - Exported Analyzer interface for external testing and mocking (PR #12)
 - Tool-agnostic pattern matching (not tied to specific tool names)
@@ -189,7 +190,7 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 - Unknown LLM responses default to unsafe (fail-closed) to prevent bypass via malformed output (#19)
 - Deferred Close() errors explicitly silenced where cleanup failure is non-critical (#6)
 - Audit log sanitization to prevent log injection via ANSI escapes, control chars, and newlines (#22, #6)
-- SSRF patterns added: AWS metadata (169.254.169.254), GCP metadata (metadata.google.internal), ECS credentials (169.254.170.2) (#19)
+- SSRF patterns added: AWS metadata (169.254.169.254), GCP metadata (metadata.google.internal), ECS credentials (169.254.170.2), Azure IMDS (metadata.azure.com) (#19)
 - Mode-aware error handling: agent/LLM errors fail-open in permissive mode, fail-closed otherwise (#19)
 - Endpoint validation enforces http/https schemes for LLM and agent endpoints to prevent file:// and other protocol exploits (#19)
 - Error message sanitization: generic "service error" prevents leakage of internal details (hostnames, connection strings), detailed errors logged to stderr (#32)
