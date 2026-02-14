@@ -3,7 +3,7 @@
 <!-- AUTO-MANAGED: module-description -->
 ## Purpose
 
-Regex-based threat pattern matching engine. Layer 1 in the detection pipeline - fast, deterministic matching against 93 patterns covering technical threats (T1-T9) including prompt injection (T5).
+Regex-based threat pattern matching engine. Layer 1 in the detection pipeline - fast, deterministic matching against 96 patterns covering technical threats (T1-T9) including prompt injection (T5) and SSRF (T1).
 
 <!-- END AUTO-MANAGED -->
 
@@ -14,7 +14,7 @@ Regex-based threat pattern matching engine. Layer 1 in the detection pipeline - 
 patterns/
 ├── matcher.go        # Pattern matching engine
 ├── matcher_test.go   # Test coverage
-└── patterns.yaml     # Embedded pattern definitions (93 patterns)
+└── patterns.yaml     # Embedded pattern definitions (96 patterns)
 ```
 
 **Key Types:**
@@ -26,7 +26,7 @@ patterns/
 **Pattern Categories:**
 | Category | Description | Count |
 |----------|-------------|-------|
-| T1 | Network exfiltration | 3 |
+| T1 | Network exfiltration & SSRF | 6 |
 | T2 | Credential access | 7 |
 | T3 | Command injection | 5+ |
 | T4 | Filesystem attacks | 5+ |

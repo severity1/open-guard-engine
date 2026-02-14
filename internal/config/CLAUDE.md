@@ -69,6 +69,7 @@ config/
 - Mode must be one of: `strict`, `confirm`, `permissive`
 - Agent provider must be: `claude` or `ollama` (if set)
 - Negative timeout values rejected
+- Endpoint URLs validated via `validateEndpoint()` (must use http/https schemes)
 - Called automatically after config load, returns detailed errors
 
 **Error Handling:**
@@ -82,6 +83,7 @@ config/
 ## Key Dependencies
 
 - `gopkg.in/yaml.v3` - YAML parsing
+- `net/url` - URL parsing and validation
 - Internal: `(none)` - Standalone module
 
 <!-- END AUTO-MANAGED -->

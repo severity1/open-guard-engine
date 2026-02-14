@@ -6,10 +6,10 @@
 Defense-in-depth security engine for AI coding assistants. Protects codebases from prompt injection, malicious commands, and harmful content through layered detection: fast pattern matching, agent-based analysis, and LLM content safety.
 
 **Key Features:**
-- 93 threat patterns (T1-T9) with regex matching
+- 96 threat patterns (T1-T9) with regex matching
 - Claude SDK integration for semantic injection detection (T5)
 - Ollama llama-guard3 for content safety (S1-S13)
-- Encoding detection (base64, hex, ROT13, Unicode homoglyphs)
+- Encoding detection (base64, hex, ROT13, Unicode homoglyphs, fullwidth/NFKC, recursive decoding)
 - Three decision modes: strict, confirm, permissive
 
 <!-- END AUTO-MANAGED -->
@@ -70,7 +70,7 @@ open-guard-engine/
 **Detection Pipeline (layered, short-circuit on match):**
 ```
 stdin -> Layer 0: Encoding Detection (decode obfuscated content)
-      -> Layer 1: Pattern Matching (fast, deterministic, 93 patterns)
+      -> Layer 1: Pattern Matching (fast, deterministic, 96 patterns)
       -> Layer 2: Agent Analysis (Claude SDK semantic detection)
       -> Layer 3: LLM Safety (llama-guard3 content classification)
       -> stdout: JSON decision
@@ -81,10 +81,11 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 2. Config loaded via --config flag or auto-discovery (project > global > defaults)
 3. Input size validated against config's MaxInputSize (may be stricter than hardcoded limit)
 4. Encoding detector decodes obfuscated content (base64, hex, etc.)
-5. Pattern matcher checks against 93 compiled regex patterns
+5. Pattern matcher checks against 96 compiled regex patterns
 6. If no match and agent enabled, Claude analyzes with timeout and context cancellation
-7. If safe and LLM enabled, llama-guard3 classifies content safety
-8. Response handler builds JSON output based on mode (strict/confirm/permissive)
+7. If agent/LLM errors occur, handleAnalysisError applies mode-aware handling (permissive: continue, others: confirm)
+8. If safe and LLM enabled, llama-guard3 classifies content safety
+9. Response handler builds JSON output based on mode (strict/confirm/permissive)
 
 **Resource Limits:**
 - Hardcoded 10MB stdin limit applied before config load
@@ -117,7 +118,7 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 **Error Handling:**
 - Wrap errors with context: `fmt.Errorf("operation: %w", err)`
 - Early return on error, avoid deep nesting
-- Check error from deferred Close() only when it matters
+- Silence expected Close() errors in deferred calls: `defer func() { _ = resp.Body.Close() }()`
 - Distinguish context cancellation: check `ctx.Err()` separately from operation errors
 
 **Context & Timeout Handling:**
@@ -152,6 +153,11 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 - Permissive: `block`/`confirm` -> `log`
 - Audit IDs generated via UUID
 
+**Error Handling (handleAnalysisError):**
+- Agent/LLM analysis errors handled based on mode
+- Permissive mode: errors ignored, pipeline continues (fail-open)
+- Other modes: errors produce `confirm` decision with medium severity (fail-closed)
+
 **Pattern File Structure:**
 - YAML-based pattern definitions in `internal/patterns/patterns.yaml`
 - Compiled at startup via `//go:embed`
@@ -174,6 +180,16 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 - Explicit config path support via --config flag for multi-environment setups
 - Critical path hardening against DoS attacks (input size limits, timeouts, context cancellation)
 - Two-stage input validation: hardcoded limit before config, then config limit
+- Recursive base64 decoding with max depth (3 layers) to catch nested encoding without unbounded recursion (#19)
+- Fullwidth/NFKC Unicode normalization to detect obfuscated injection keywords (#19)
+- Short base64 payload detection for single-keyword injection attempts (#19)
+- Removed hardcoded LLM HTTP timeout - relies on context cancellation for timeout control (#25)
+- Unknown LLM responses default to unsafe (fail-closed) to prevent bypass via malformed output (#19)
+- Deferred Close() errors explicitly silenced where cleanup failure is non-critical (#6)
+- Audit log sanitization to prevent log injection via ANSI escapes, control chars, and newlines (#22, #6)
+- SSRF patterns added: AWS metadata (169.254.169.254), GCP metadata (metadata.google.internal), ECS credentials (169.254.170.2) (#19)
+- Mode-aware error handling: agent/LLM errors fail-open in permissive mode, fail-closed otherwise (#19)
+- Endpoint validation enforces http/https schemes for LLM and agent endpoints to prevent file:// and other protocol exploits (#19)
 
 **Commit Style:**
 - Conventional format: `type: description (#issue)`

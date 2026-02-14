@@ -25,7 +25,7 @@ llm/
 **API Integration:**
 - Uses Ollama `/api/chat` endpoint
 - Non-streaming mode for simplicity
-- 30-second HTTP timeout
+- Timeout controlled via context (no hardcoded HTTP client timeout)
 
 <!-- END AUTO-MANAGED -->
 
@@ -35,7 +35,8 @@ llm/
 **Response Parsing:**
 - Format: `"safe"` or `"unsafe\nS1,S2,..."`
 - Categories may be on same line: `"unsafe S1,S2"`
-- Unknown responses treated as safe with low confidence (0.3)
+- Unknown responses default to unsafe (fail-closed, confidence 0.0)
+- Empty responses treated as unsafe (confidence 0.0)
 
 **Availability Check:**
 - Uses `/api/tags` endpoint to list models

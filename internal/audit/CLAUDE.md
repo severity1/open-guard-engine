@@ -17,7 +17,11 @@ audit/
 ```
 
 **Key Types:**
-- `Logger` - Audit event logger with structured output
+- `Logger` - Audit event logger with structured JSON output
+- `Entry` - Audit log entry with timestamp, decision, threat metadata
+
+**Key Functions:**
+- `sanitizeLogField()` - Strips ANSI escapes, control chars, replaces newlines, truncates to 4096 chars
 
 <!-- END AUTO-MANAGED -->
 
@@ -28,6 +32,13 @@ audit/
 - Structured JSON output for machine parsing
 - Include audit ID (UUID) for event correlation
 - Timestamp all events in UTC
+
+**Security Hardening:**
+- All log fields sanitized to prevent log injection
+- ANSI escape sequences stripped via regex
+- Control characters replaced with spaces
+- Newlines replaced with spaces
+- Max field length: 4096 characters (truncated)
 
 <!-- END AUTO-MANAGED -->
 
