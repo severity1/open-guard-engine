@@ -6,11 +6,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/severity1/open-guard-engine/internal/types"
 )
+
+const maxLogMessageLength = 4096
 
 // Entry represents a single audit log entry.
 type Entry struct {
@@ -79,16 +84,43 @@ func (l *Logger) LogFromOutput(input *types.HookInput, output *types.HookOutput)
 	entry := &Entry{
 		Timestamp:   time.Now().UTC(),
 		AuditID:     output.AuditID,
-		Event:       input.Event,
-		ToolName:    input.ToolName,
+		Event:       sanitizeLogField(input.Event),
+		ToolName:    sanitizeLogField(input.ToolName),
 		Decision:    output.Decision,
 		ThreatLevel: output.ThreatLevel,
 		ThreatType:  output.ThreatType,
-		Message:     output.Message,
+		Message:     sanitizeLogField(output.Message),
 		SessionID:   input.SessionID,
 	}
 
 	return l.Log(entry)
+}
+
+// ansiEscapePattern matches ANSI escape sequences.
+var ansiEscapePattern = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+
+// sanitizeLogField strips ANSI escapes and control characters, replaces
+// newlines with spaces, and truncates to maxLogMessageLength to prevent
+// log injection.
+func sanitizeLogField(s string) string {
+	// Strip ANSI escape sequences first
+	s = ansiEscapePattern.ReplaceAllString(s, "")
+
+	s = strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\r' {
+			return ' '
+		}
+		if unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, s)
+
+	if len(s) > maxLogMessageLength {
+		s = s[:maxLogMessageLength]
+	}
+
+	return s
 }
 
 // Close closes the log file.

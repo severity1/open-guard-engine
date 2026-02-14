@@ -53,7 +53,7 @@ func TestLogger_Log(t *testing.T) {
 	require.NoError(t, err)
 
 	// Close to flush
-	logger.Close()
+	_ = logger.Close()
 
 	// Read and verify log file
 	logPath := filepath.Join(logDir, "audit.log")
@@ -98,7 +98,7 @@ func TestLogger_LogFromOutput(t *testing.T) {
 	require.NoError(t, err)
 
 	// Close to flush
-	logger.Close()
+	_ = logger.Close()
 
 	// Read and verify
 	logPath := filepath.Join(logDir, "audit.log")
@@ -135,7 +135,7 @@ func TestLogger_MultipleEntries(t *testing.T) {
 	}
 
 	// Close to flush
-	logger.Close()
+	_ = logger.Close()
 
 	// Read and count entries
 	logPath := filepath.Join(logDir, "audit.log")
@@ -185,7 +185,7 @@ func TestLogger_Log_SetsTimestamp(t *testing.T) {
 	after := time.Now().UTC()
 
 	// Close to flush
-	logger.Close()
+	_ = logger.Close()
 
 	// Read and verify timestamp was set
 	logPath := filepath.Join(logDir, "audit.log")
@@ -224,7 +224,7 @@ func TestLogger_Log_PreservesTimestamp(t *testing.T) {
 	require.NoError(t, err)
 
 	// Close to flush
-	logger.Close()
+	_ = logger.Close()
 
 	// Read and verify timestamp was preserved
 	logPath := filepath.Join(logDir, "audit.log")
@@ -284,7 +284,7 @@ func TestLogger_ConcurrentWrites(t *testing.T) {
 	wg.Wait()
 
 	// Close to flush
-	logger.Close()
+	_ = logger.Close()
 
 	// Count entries
 	logPath := filepath.Join(logDir, "audit.log")
