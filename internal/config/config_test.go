@@ -499,3 +499,74 @@ agent:
 	assert.Equal(t, 90, cfg.Agent.TimeoutSeconds, "global timeout should be preserved")
 	assert.True(t, cfg.Agent.Enabled, "project enabled should override")
 }
+
+// --- Tests for #19: Endpoint URL validation ---
+
+func TestConfig_Validate_Endpoints(t *testing.T) {
+	tests := []struct {
+		name        string
+		llmEndpoint string
+		agentEndpoint string
+		wantErr     bool
+	}{
+		{
+			name:        "invalid LLM endpoint - not a URL",
+			llmEndpoint: "not-a-url",
+			wantErr:     true,
+		},
+		{
+			name:        "invalid LLM endpoint - wrong scheme",
+			llmEndpoint: "ftp://wrong",
+			wantErr:     true,
+		},
+		{
+			name:        "valid LLM endpoint - empty uses default",
+			llmEndpoint: "",
+			wantErr:     false,
+		},
+		{
+			name:        "valid LLM endpoint - http localhost",
+			llmEndpoint: "http://localhost:11434",
+			wantErr:     false,
+		},
+		{
+			name:          "invalid Agent endpoint - not a URL",
+			agentEndpoint: "not-a-url",
+			wantErr:       true,
+		},
+		{
+			name:          "invalid Agent endpoint - wrong scheme",
+			agentEndpoint: "ftp://wrong",
+			wantErr:       true,
+		},
+		{
+			name:          "valid Agent endpoint - empty uses default",
+			agentEndpoint: "",
+			wantErr:       false,
+		},
+		{
+			name:          "valid Agent endpoint - http localhost",
+			agentEndpoint: "http://localhost:11434",
+			wantErr:       false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			if tc.llmEndpoint != "" {
+				cfg.LLM.Endpoint = tc.llmEndpoint
+			}
+			if tc.agentEndpoint != "" {
+				cfg.Agent.Endpoint = tc.agentEndpoint
+			}
+			err := cfg.Validate()
+			if tc.wantErr {
+				require.Error(t, err, "expected validation error for endpoint")
+				assert.Contains(t, err.Error(), "endpoint")
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

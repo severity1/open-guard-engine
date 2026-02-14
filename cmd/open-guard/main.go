@@ -319,6 +319,13 @@ func severityOrder(s types.ThreatLevel) int {
 	return order[s]
 }
 
+// handleAnalysisError handles errors from agent/LLM analysis layers.
+// In strict mode, errors result in blocking. In confirm mode, errors prompt for confirmation.
+// In permissive mode, errors are ignored and the pipeline continues.
+func handleAnalysisError(cfg *config.Config, respHandler *response.Handler, source types.DetectionSource, category types.ThreatCategory, err error) *types.HookOutput {
+	panic("not implemented")
+}
+
 func mapCategory(categories []string) types.ThreatCategory {
 	if len(categories) == 0 {
 		return types.SafetyCategoryViolentCrimes // S1 default for unknown LLM output

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -21,7 +22,7 @@ func TestNewLogger(t *testing.T) {
 
 	logger, err := NewLogger(logDir)
 	require.NoError(t, err)
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	assert.NotNil(t, logger)
 	assert.DirExists(t, logDir)
@@ -34,7 +35,7 @@ func TestLogger_Log(t *testing.T) {
 
 	logger, err := NewLogger(logDir)
 	require.NoError(t, err)
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	entry := &Entry{
 		Timestamp:   time.Now().UTC(),
@@ -58,7 +59,7 @@ func TestLogger_Log(t *testing.T) {
 	logPath := filepath.Join(logDir, "audit.log")
 	file, err := os.Open(logPath)
 	require.NoError(t, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var readEntry Entry
 	err = json.NewDecoder(file).Decode(&readEntry)
@@ -77,7 +78,7 @@ func TestLogger_LogFromOutput(t *testing.T) {
 
 	logger, err := NewLogger(logDir)
 	require.NoError(t, err)
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	input := &types.HookInput{
 		Event:     "pre-tool",
@@ -103,7 +104,7 @@ func TestLogger_LogFromOutput(t *testing.T) {
 	logPath := filepath.Join(logDir, "audit.log")
 	file, err := os.Open(logPath)
 	require.NoError(t, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var readEntry Entry
 	err = json.NewDecoder(file).Decode(&readEntry)
@@ -120,7 +121,7 @@ func TestLogger_MultipleEntries(t *testing.T) {
 
 	logger, err := NewLogger(logDir)
 	require.NoError(t, err)
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	// Write multiple entries
 	for i := 0; i < 5; i++ {
@@ -140,7 +141,7 @@ func TestLogger_MultipleEntries(t *testing.T) {
 	logPath := filepath.Join(logDir, "audit.log")
 	file, err := os.Open(logPath)
 	require.NoError(t, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	scanner := bufio.NewScanner(file)
 	count := 0
@@ -157,7 +158,7 @@ func TestLogger_LogPath(t *testing.T) {
 
 	logger, err := NewLogger(logDir)
 	require.NoError(t, err)
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	expected := filepath.Join(logDir, "audit.log")
 	assert.Equal(t, expected, logger.LogPath())
@@ -169,7 +170,7 @@ func TestLogger_Log_SetsTimestamp(t *testing.T) {
 
 	logger, err := NewLogger(logDir)
 	require.NoError(t, err)
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	// Create entry with zero timestamp
 	entry := &Entry{
@@ -190,7 +191,7 @@ func TestLogger_Log_SetsTimestamp(t *testing.T) {
 	logPath := filepath.Join(logDir, "audit.log")
 	file, err := os.Open(logPath)
 	require.NoError(t, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var readEntry Entry
 	err = json.NewDecoder(file).Decode(&readEntry)
@@ -208,7 +209,7 @@ func TestLogger_Log_PreservesTimestamp(t *testing.T) {
 
 	logger, err := NewLogger(logDir)
 	require.NoError(t, err)
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	// Create entry with explicit timestamp
 	fixedTime := time.Date(2024, 6, 15, 10, 30, 0, 0, time.UTC)
@@ -229,7 +230,7 @@ func TestLogger_Log_PreservesTimestamp(t *testing.T) {
 	logPath := filepath.Join(logDir, "audit.log")
 	file, err := os.Open(logPath)
 	require.NoError(t, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var readEntry Entry
 	err = json.NewDecoder(file).Decode(&readEntry)
@@ -256,7 +257,7 @@ func TestLogger_ConcurrentWrites(t *testing.T) {
 
 	logger, err := NewLogger(logDir)
 	require.NoError(t, err)
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	// Write concurrently from multiple goroutines
 	numGoroutines := 10
@@ -289,7 +290,7 @@ func TestLogger_ConcurrentWrites(t *testing.T) {
 	logPath := filepath.Join(logDir, "audit.log")
 	file, err := os.Open(logPath)
 	require.NoError(t, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	scanner := bufio.NewScanner(file)
 	count := 0
@@ -339,7 +340,7 @@ func TestNewLogger_DefaultDirectory(t *testing.T) {
 	if err != nil {
 		t.Skip("Cannot create logger in home directory")
 	}
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	expectedPath := filepath.Join(homeDir, ".open-guard", "logs", "audit.log")
 	assert.Equal(t, expectedPath, logger.LogPath())
@@ -374,4 +375,116 @@ func TestEntry_AllFields(t *testing.T) {
 	assert.Equal(t, entry.ThreatType, decoded.ThreatType)
 	assert.Equal(t, entry.Message, decoded.Message)
 	assert.Equal(t, entry.SessionID, decoded.SessionID)
+}
+
+func TestLogger_LogFromOutput_SanitizesMessage(t *testing.T) {
+	tests := []struct {
+		name            string
+		message         string
+		toolName        string
+		event           string
+		expectMessage   string
+		expectToolName  string
+		expectEvent     string
+	}{
+		{
+			name:           "control chars stripped",
+			message:        "threat\x00detected\x1b[31m",
+			toolName:       "Bash",
+			event:          "pre-tool",
+			expectMessage:  "threat detected",
+			expectToolName: "Bash",
+			expectEvent:    "pre-tool",
+		},
+		{
+			name:           "newlines replaced with space",
+			message:        "line1\nline2\rline3",
+			toolName:       "Bash",
+			event:          "pre-tool",
+			expectMessage:  "line1 line2 line3",
+			expectToolName: "Bash",
+			expectEvent:    "pre-tool",
+		},
+		{
+			name:           "long message truncated",
+			message:        strings.Repeat("a", 5000),
+			toolName:       "Bash",
+			event:          "pre-tool",
+			expectMessage:  strings.Repeat("a", 4096),
+			expectToolName: "Bash",
+			expectEvent:    "pre-tool",
+		},
+		{
+			name:           "clean message unchanged",
+			message:        "Normal threat message",
+			toolName:       "Bash",
+			event:          "pre-tool",
+			expectMessage:  "Normal threat message",
+			expectToolName: "Bash",
+			expectEvent:    "pre-tool",
+		},
+		{
+			name:           "tool name sanitized",
+			message:        "test",
+			toolName:       "Bash\x00injected",
+			event:          "pre-tool",
+			expectMessage:  "test",
+			expectToolName: "Bash injected",
+			expectEvent:    "pre-tool",
+		},
+		{
+			name:           "event sanitized",
+			message:        "test",
+			toolName:       "Bash",
+			event:          "pre-tool\ninjected",
+			expectMessage:  "test",
+			expectToolName: "Bash",
+			expectEvent:    "pre-tool injected",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			logDir := filepath.Join(tmpDir, "logs")
+
+			logger, err := NewLogger(logDir)
+			require.NoError(t, err)
+			defer func() { _ = logger.Close() }()
+
+			input := &types.HookInput{
+				Event:     tc.event,
+				ToolName:  tc.toolName,
+				SessionID: "session-test",
+			}
+
+			output := &types.HookOutput{
+				Decision:    types.DecisionBlock,
+				ThreatLevel: types.ThreatLevelHigh,
+				ThreatType:  types.ThreatCategoryInjection,
+				Message:     tc.message,
+				AuditID:     "audit-sanitize",
+			}
+
+			err = logger.LogFromOutput(input, output)
+			require.NoError(t, err)
+
+			// Close to flush
+			_ = logger.Close()
+
+			// Read and verify
+			logPath := filepath.Join(logDir, "audit.log")
+			file, err := os.Open(logPath)
+			require.NoError(t, err)
+			defer func() { _ = file.Close() }()
+
+			var readEntry Entry
+			err = json.NewDecoder(file).Decode(&readEntry)
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.expectMessage, readEntry.Message)
+			assert.Equal(t, tc.expectToolName, readEntry.ToolName)
+			assert.Equal(t, tc.expectEvent, readEntry.Event)
+		})
+	}
 }

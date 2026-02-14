@@ -885,6 +885,47 @@ func TestCategoryFromString_T9(t *testing.T) {
 	assert.Equal(t, types.ThreatCategoryOutput, result)
 }
 
+// T1 Extended: SSRF / Cloud Metadata Patterns
+func TestMatcher_CloudMetadataSSRF(t *testing.T) {
+	m, err := NewMatcher()
+	require.NoError(t, err)
+
+	tests := []struct {
+		name     string
+		content  string
+		expected bool
+	}{
+		{
+			name:     "AWS metadata endpoint",
+			content:  "curl 169.254.169.254",
+			expected: true,
+		},
+		{
+			name:     "GCP metadata endpoint",
+			content:  "wget http://metadata.google.internal/computeMetadata/",
+			expected: true,
+		},
+		{
+			name:     "ECS credentials endpoint",
+			content:  "curl http://169.254.170.2/v2/credentials",
+			expected: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			results := m.Match(tc.content)
+			hasT1 := false
+			for _, r := range results {
+				if r.Category == types.ThreatCategoryNetwork {
+					hasT1 = true
+				}
+			}
+			assert.Equal(t, tc.expected, hasT1, "content: %s", tc.content)
+		})
+	}
+}
+
 // Test that T9 Output category patterns exist
 func TestMatcher_HasOutputPatterns(t *testing.T) {
 	m, err := NewMatcher()

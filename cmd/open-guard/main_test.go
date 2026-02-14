@@ -2,11 +2,14 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/severity1/open-guard-engine/internal/config"
+	"github.com/severity1/open-guard-engine/internal/response"
 	"github.com/severity1/open-guard-engine/internal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -565,6 +568,58 @@ func TestAnalyzeCommand_SpecialCharacters(t *testing.T) {
 			output := buf.String()
 			// Should produce valid JSON output
 			assert.Contains(t, output, `"decision"`)
+		})
+	}
+}
+
+func TestHandleAnalysisError(t *testing.T) {
+	testErr := fmt.Errorf("analysis timed out")
+
+	tests := []struct {
+		name     string
+		mode     config.Mode
+		wantNil  bool
+		wantDecision types.Decision
+	}{
+		{
+			name:         "strict mode blocks on error",
+			mode:         config.ModeStrict,
+			wantNil:      false,
+			wantDecision: types.DecisionBlock,
+		},
+		{
+			name:         "confirm mode confirms on error",
+			mode:         config.ModeConfirm,
+			wantNil:      false,
+			wantDecision: types.DecisionConfirm,
+		},
+		{
+			name:    "permissive mode continues pipeline",
+			mode:    config.ModePermissive,
+			wantNil: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := config.DefaultConfig()
+			cfg.Mode = tc.mode
+			respHandler := response.NewHandler(cfg)
+
+			output := handleAnalysisError(
+				cfg,
+				respHandler,
+				types.DetectionSourceAgent,
+				types.ThreatCategoryPromptInjection,
+				testErr,
+			)
+
+			if tc.wantNil {
+				assert.Nil(t, output, "permissive mode should return nil to continue pipeline")
+			} else {
+				require.NotNil(t, output)
+				assert.Equal(t, tc.wantDecision, output.Decision)
+			}
 		})
 	}
 }
