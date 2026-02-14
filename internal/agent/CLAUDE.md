@@ -67,6 +67,7 @@ The analyzer runs in a hardened sandbox:
 - Table-driven tests with `testify/assert` and `testify/require`
 - Custom `mockIterator` for testing `collectResponse()` with various scenarios
 - Tests for context cancellation, `ErrNoMoreMessages` handling, and error propagation
+- `buildEnv()` tests verify map isolation and concurrent access safety
 - TDD approach: tests written before implementation (e.g., `buildEnv()` tests)
 - Coverage: 95.5% as of commit cad6545
 

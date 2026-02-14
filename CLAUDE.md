@@ -165,6 +165,7 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 **Recent Design Decisions:**
 - Extracted collectResponse() for testability and improved context cancellation handling (PR #4)
 - Race condition fix: replaced setupOllamaEnv (parent env mutation) with buildEnv (subprocess env map) to eliminate shared state mutation (PR #8)
+- buildEnv() returns new map each call to ensure concurrent access safety and isolation
 - Strict validation for ThreatCategory and Config values to fail fast on invalid YAML/config (PR #15)
 - Exported Analyzer interface for external testing and mocking (PR #12)
 - Tool-agnostic pattern matching (not tied to specific tool names)
