@@ -49,6 +49,13 @@ patterns:
     severity: critical
     pattern: '169\.254\.170\.2'
 
+  - id: T1-007
+    category: T1
+    name: azure_metadata_ssrf
+    description: Azure IMDS metadata endpoint access (SSRF)
+    severity: critical
+    pattern: '(?i)metadata\.azure\.com'
+
   # T2: Credential access
   - id: T2-001
     category: T2

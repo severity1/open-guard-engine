@@ -916,6 +916,16 @@ func TestMatcher_CloudMetadataSSRF(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "Azure IMDS endpoint",
+			content:  "curl -H 'Metadata: true' http://metadata.azure.com/metadata/instance",
+			expected: true,
+		},
+		{
+			name:     "Azure IMDS endpoint uppercase",
+			content:  "wget http://METADATA.AZURE.COM/metadata/",
+			expected: true,
+		},
+		{
 			name:     "similar IP no match",
 			content:  "curl 169.254.169.253",
 			expected: false,
