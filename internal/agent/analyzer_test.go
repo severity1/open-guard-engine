@@ -3,9 +3,10 @@ package agent
 import (
 	"context"
 	"errors"
-	"os"
+	"sync"
 	"testing"
 
+	claudecode "github.com/severity1/claude-agent-sdk-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -214,30 +215,6 @@ func TestResult_Fields(t *testing.T) {
 	assert.NotEmpty(t, result.Reason)
 }
 
-func TestClaudeAnalyzer_SetupOllamaEnv(t *testing.T) {
-	t.Run("ollama provider sets env vars", func(t *testing.T) {
-		analyzer := NewClaudeAnalyzer("llama3:latest", ".", "ollama", "http://localhost:11434")
-
-		// Call setupOllamaEnv and get cleanup function
-		cleanup := analyzer.setupOllamaEnv()
-		defer cleanup()
-
-		// Verify env vars are set for Ollama
-		assert.Equal(t, "ollama", os.Getenv("ANTHROPIC_AUTH_TOKEN"))
-		assert.Equal(t, "", os.Getenv("ANTHROPIC_API_KEY"))
-		assert.Equal(t, "http://localhost:11434", os.Getenv("ANTHROPIC_BASE_URL"))
-	})
-
-	t.Run("claude provider does not change env vars", func(t *testing.T) {
-		analyzer := NewClaudeAnalyzer("claude-sonnet-4-20250514", ".", "claude", "")
-
-		cleanup := analyzer.setupOllamaEnv()
-		defer cleanup()
-
-		// For claude provider, no env vars should be changed
-		// (just verify cleanup function is returned and callable)
-	})
-}
 
 func TestParseClaudeResponse_Comprehensive(t *testing.T) {
 	tests := []struct {
@@ -290,54 +267,6 @@ func TestParseClaudeResponse_Comprehensive(t *testing.T) {
 	}
 }
 
-func TestClaudeAnalyzer_SetupOllamaEnv_RestoresOriginal(t *testing.T) {
-	// Set original values
-	originalToken := "original-token"
-	originalKey := "original-key"
-	originalURL := "http://original.com"
-
-	os.Setenv("ANTHROPIC_AUTH_TOKEN", originalToken)
-	os.Setenv("ANTHROPIC_API_KEY", originalKey)
-	os.Setenv("ANTHROPIC_BASE_URL", originalURL)
-	defer func() {
-		os.Unsetenv("ANTHROPIC_AUTH_TOKEN")
-		os.Unsetenv("ANTHROPIC_API_KEY")
-		os.Unsetenv("ANTHROPIC_BASE_URL")
-	}()
-
-	analyzer := NewClaudeAnalyzer("llama3:latest", ".", "ollama", "http://localhost:11434")
-
-	// Setup and verify changes
-	cleanup := analyzer.setupOllamaEnv()
-	assert.Equal(t, "ollama", os.Getenv("ANTHROPIC_AUTH_TOKEN"))
-	assert.Equal(t, "", os.Getenv("ANTHROPIC_API_KEY"))
-	assert.Equal(t, "http://localhost:11434", os.Getenv("ANTHROPIC_BASE_URL"))
-
-	// Cleanup and verify restoration
-	cleanup()
-	assert.Equal(t, originalToken, os.Getenv("ANTHROPIC_AUTH_TOKEN"))
-	assert.Equal(t, originalKey, os.Getenv("ANTHROPIC_API_KEY"))
-	assert.Equal(t, originalURL, os.Getenv("ANTHROPIC_BASE_URL"))
-}
-
-func TestClaudeAnalyzer_SetupOllamaEnv_RestoresEmptyOriginal(t *testing.T) {
-	// Clear env vars first
-	os.Unsetenv("ANTHROPIC_AUTH_TOKEN")
-	os.Unsetenv("ANTHROPIC_API_KEY")
-	os.Unsetenv("ANTHROPIC_BASE_URL")
-
-	analyzer := NewClaudeAnalyzer("llama3:latest", ".", "ollama", "http://localhost:11434")
-
-	// Setup and verify changes
-	cleanup := analyzer.setupOllamaEnv()
-	assert.Equal(t, "ollama", os.Getenv("ANTHROPIC_AUTH_TOKEN"))
-
-	// Cleanup should restore to empty
-	cleanup()
-	assert.Equal(t, "", os.Getenv("ANTHROPIC_AUTH_TOKEN"))
-	assert.Equal(t, "", os.Getenv("ANTHROPIC_API_KEY"))
-	assert.Equal(t, "", os.Getenv("ANTHROPIC_BASE_URL"))
-}
 
 func TestNewClaudeAnalyzer_AllDefaults(t *testing.T) {
 	// Test with all empty strings - should use all defaults
@@ -427,4 +356,271 @@ func TestAnalyze_DeadlineExceeded(t *testing.T) {
 	assert.Nil(t, result)
 	assert.True(t, errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded),
 		"error should be a context error, got: %v", err)
+}
+
+// --- mockIterator for testing collectResponse ---
+
+type mockIterator struct {
+	messages []claudecode.Message
+	errors   []error // parallel to messages; nil means no error for that call
+	index    int
+	closed   bool
+}
+
+func (m *mockIterator) Next(_ context.Context) (claudecode.Message, error) {
+	if m.index >= len(m.messages) {
+		return nil, claudecode.ErrNoMoreMessages
+	}
+	i := m.index
+	m.index++
+	if m.errors != nil && m.errors[i] != nil {
+		return nil, m.errors[i]
+	}
+	return m.messages[i], nil
+}
+
+func (m *mockIterator) Close() error {
+	m.closed = true
+	return nil
+}
+
+// --- Tests for collectResponse ---
+
+func TestCollectResponse_SafeText(t *testing.T) {
+	iter := &mockIterator{
+		messages: []claudecode.Message{
+			&claudecode.AssistantMessage{
+				Content: []claudecode.ContentBlock{
+					&claudecode.TextBlock{Text: "SAFE"},
+				},
+			},
+		},
+	}
+
+	result, err := collectResponse(context.Background(), iter)
+	require.NoError(t, err)
+	assert.True(t, result.Safe)
+}
+
+func TestCollectResponse_InjectionText(t *testing.T) {
+	iter := &mockIterator{
+		messages: []claudecode.Message{
+			&claudecode.AssistantMessage{
+				Content: []claudecode.ContentBlock{
+					&claudecode.TextBlock{Text: "INJECTION: override system prompt"},
+				},
+			},
+		},
+	}
+
+	result, err := collectResponse(context.Background(), iter)
+	require.NoError(t, err)
+	assert.False(t, result.Safe)
+	assert.Contains(t, result.Categories, "T5")
+}
+
+func TestCollectResponse_MultipleMessages(t *testing.T) {
+	iter := &mockIterator{
+		messages: []claudecode.Message{
+			&claudecode.AssistantMessage{
+				Content: []claudecode.ContentBlock{
+					&claudecode.TextBlock{Text: "SA"},
+				},
+			},
+			&claudecode.AssistantMessage{
+				Content: []claudecode.ContentBlock{
+					&claudecode.TextBlock{Text: "FE"},
+				},
+			},
+		},
+	}
+
+	result, err := collectResponse(context.Background(), iter)
+	require.NoError(t, err)
+	assert.True(t, result.Safe)
+}
+
+func TestCollectResponse_IteratorError(t *testing.T) {
+	iter := &mockIterator{
+		messages: []claudecode.Message{nil},
+		errors:   []error{errors.New("connection lost")},
+	}
+
+	result, err := collectResponse(context.Background(), iter)
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "reading response")
+}
+
+func TestCollectResponse_ContextCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	iter := &mockIterator{
+		messages: []claudecode.Message{
+			&claudecode.AssistantMessage{
+				Content: []claudecode.ContentBlock{
+					&claudecode.TextBlock{Text: "SAFE"},
+				},
+			},
+		},
+	}
+
+	result, err := collectResponse(ctx, iter)
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.True(t, errors.Is(err, context.Canceled))
+}
+
+func TestCollectResponse_IteratorErrorWithCancelledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Iterator returns one message, then an error after context is cancelled
+	iter := &mockIterator{
+		messages: []claudecode.Message{
+			&claudecode.AssistantMessage{
+				Content: []claudecode.ContentBlock{
+					&claudecode.TextBlock{Text: "partial"},
+				},
+			},
+			nil, // second call will error
+		},
+		errors: []error{nil, errors.New("stream error")},
+	}
+
+	// Cancel context after first successful message
+	// collectResponse should check ctx after first iteration
+	cancel()
+
+	result, err := collectResponse(ctx, iter)
+	require.Error(t, err)
+	assert.Nil(t, result)
+	// Should return context error since ctx was cancelled
+	assert.True(t, errors.Is(err, context.Canceled))
+}
+
+func TestCollectResponse_EmptyResponse(t *testing.T) {
+	// Iterator has no messages - produces empty string which parseClaudeResponse rejects
+	iter := &mockIterator{}
+
+	result, err := collectResponse(context.Background(), iter)
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "empty response")
+}
+
+func TestClaudeAnalyzer_BuildEnv(t *testing.T) {
+	tests := []struct {
+		name     string
+		provider string
+		endpoint string
+		wantNil  bool
+		wantEnv  map[string]string
+	}{
+		{
+			name:     "claude provider returns nil",
+			provider: "claude",
+			endpoint: "",
+			wantNil:  true,
+		},
+		{
+			name:     "ollama provider returns env map",
+			provider: "ollama",
+			endpoint: "http://localhost:11434",
+			wantEnv: map[string]string{
+				"ANTHROPIC_BASE_URL":   "http://localhost:11434",
+				"ANTHROPIC_AUTH_TOKEN": "ollama",
+				"ANTHROPIC_API_KEY":    "",
+			},
+		},
+		{
+			name:     "ollama custom endpoint",
+			provider: "ollama",
+			endpoint: "http://custom:8080",
+			wantEnv: map[string]string{
+				"ANTHROPIC_BASE_URL":   "http://custom:8080",
+				"ANTHROPIC_AUTH_TOKEN": "ollama",
+				"ANTHROPIC_API_KEY":    "",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			analyzer := NewClaudeAnalyzer("test-model", ".", tt.provider, tt.endpoint)
+			env := analyzer.buildEnv()
+
+			if tt.wantNil {
+				assert.Nil(t, env)
+				return
+			}
+
+			require.NotNil(t, env)
+			for key, want := range tt.wantEnv {
+				assert.Equal(t, want, env[key], "env key %s", key)
+			}
+		})
+	}
+}
+
+func TestClaudeAnalyzer_BuildEnv_MapIsolation(t *testing.T) {
+	analyzer := NewClaudeAnalyzer("llama3:latest", ".", "ollama", "http://localhost:11434")
+	env1 := analyzer.buildEnv()
+	env2 := analyzer.buildEnv()
+
+	// Mutating one map must not affect the other
+	env1["ANTHROPIC_AUTH_TOKEN"] = "modified"
+	assert.Equal(t, "ollama", env2["ANTHROPIC_AUTH_TOKEN"])
+}
+
+func TestAnalyze_CancelledContext_BothProviders(t *testing.T) {
+	tests := []struct {
+		name     string
+		provider string
+		endpoint string
+	}{
+		{"claude provider", "claude", ""},
+		{"ollama provider", "ollama", "http://localhost:11434"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			analyzer := NewClaudeAnalyzer("test-model", ".", tt.provider, tt.endpoint)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			result, err := analyzer.Analyze(ctx, "test content")
+			require.Error(t, err)
+			assert.Nil(t, result)
+			assert.True(t, errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded),
+				"error should be a context error, got: %v", err)
+		})
+	}
+}
+
+func TestClaudeAnalyzer_BuildEnv_Concurrent(t *testing.T) {
+	analyzer := NewClaudeAnalyzer("test-model", ".", "ollama", "http://localhost:11434")
+
+	const goroutines = 10
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+
+	results := make([]map[string]string, goroutines)
+	for i := range goroutines {
+		go func(idx int) {
+			defer wg.Done()
+			results[idx] = analyzer.buildEnv()
+		}(i)
+	}
+
+	wg.Wait()
+
+	// All goroutines should produce identical, correct results
+	for i, env := range results {
+		require.NotNil(t, env, "goroutine %d returned nil", i)
+		assert.Equal(t, "http://localhost:11434", env["ANTHROPIC_BASE_URL"], "goroutine %d", i)
+		assert.Equal(t, "ollama", env["ANTHROPIC_AUTH_TOKEN"], "goroutine %d", i)
+		assert.Equal(t, "", env["ANTHROPIC_API_KEY"], "goroutine %d", i)
+	}
 }

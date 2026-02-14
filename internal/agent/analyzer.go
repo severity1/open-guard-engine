@@ -65,46 +65,30 @@ func NewClaudeAnalyzer(model, projectRoot, provider, endpoint string) *ClaudeAna
 	}
 }
 
-// setupOllamaEnv sets environment variables for Ollama provider and returns a cleanup function.
-// When provider is "ollama", it sets ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN
-// to route Claude Code SDK requests to the local Ollama endpoint.
-func (a *ClaudeAnalyzer) setupOllamaEnv() func() {
+// buildEnv returns environment variables for the subprocess.
+// For "ollama" provider, returns a map routing Claude Code SDK requests
+// to the local Ollama endpoint. For "claude" provider, returns nil (no override).
+func (a *ClaudeAnalyzer) buildEnv() map[string]string {
 	if a.provider != "ollama" {
-		return func() {}
+		return nil
 	}
-
-	// Save original values
-	origToken := os.Getenv("ANTHROPIC_AUTH_TOKEN")
-	origKey := os.Getenv("ANTHROPIC_API_KEY")
-	origURL := os.Getenv("ANTHROPIC_BASE_URL")
-
-	// Set Ollama env vars
-	os.Setenv("ANTHROPIC_AUTH_TOKEN", "ollama")
-	os.Setenv("ANTHROPIC_API_KEY", "")
-	os.Setenv("ANTHROPIC_BASE_URL", a.endpoint)
-
-	// Return cleanup function to restore original values
-	return func() {
-		os.Setenv("ANTHROPIC_AUTH_TOKEN", origToken)
-		os.Setenv("ANTHROPIC_API_KEY", origKey)
-		os.Setenv("ANTHROPIC_BASE_URL", origURL)
+	return map[string]string{
+		"ANTHROPIC_BASE_URL":   a.endpoint,
+		"ANTHROPIC_AUTH_TOKEN": "ollama",
+		"ANTHROPIC_API_KEY":    "",
 	}
 }
 
 // Analyze checks if content contains prompt injection attempts.
 // content is raw unstructured text (prompt, command, etc.) from the plugin.
 func (a *ClaudeAnalyzer) Analyze(ctx context.Context, content string) (*Result, error) {
-	// Set up Ollama environment if needed
-	cleanup := a.setupOllamaEnv()
-	defer cleanup()
-
 	// SECURITY: Create isolated temp directory (no .claude/ configs)
 	// This prevents malicious projects from injecting settings, hooks, or plugins
 	tmpDir, err := os.MkdirTemp("", "open-guard-analyze-*")
 	if err != nil {
 		return nil, fmt.Errorf("creating temp dir: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	prompt := injectionAnalysisPrompt(content)
 
@@ -124,44 +108,15 @@ func (a *ClaudeAnalyzer) Analyze(ctx context.Context, content string) (*Result, 
 		claudecode.WithSettingSources(claudecode.SettingSourceUser),
 		// SECURITY: Disable all MCP servers (no --mcp-config provided = none loaded)
 		claudecode.WithExtraArgs(map[string]*string{"strict-mcp-config": nil}),
+		// Pass Ollama env vars to subprocess (nil for claude provider is a no-op)
+		claudecode.WithEnv(a.buildEnv()),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("claude query: %w", err)
 	}
-	defer iterator.Close()
+	defer func() { _ = iterator.Close() }()
 
-	// Collect the response
-	var response strings.Builder
-	for {
-		// Check for context cancellation before each iteration
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-		}
-
-		msg, err := iterator.Next(ctx)
-		if errors.Is(err, claudecode.ErrNoMoreMessages) {
-			break
-		}
-		if err != nil {
-			if ctx.Err() != nil {
-				return nil, ctx.Err()
-			}
-			return nil, fmt.Errorf("reading response: %w", err)
-		}
-
-		// Extract text content from assistant messages
-		if assistant, ok := msg.(*claudecode.AssistantMessage); ok {
-			for _, block := range assistant.Content {
-				if textBlock, ok := block.(*claudecode.TextBlock); ok {
-					response.WriteString(textBlock.Text)
-				}
-			}
-		}
-	}
-
-	return parseClaudeResponse(response.String())
+	return collectResponse(ctx, iterator)
 }
 
 // IsAvailable returns true if the analyzer can be used.
@@ -179,6 +134,40 @@ func (a *ClaudeAnalyzer) IsAvailable() bool {
 func (a *ClaudeAnalyzer) Close() error {
 	// No resources to clean up for Query API
 	return nil
+}
+
+// collectResponse reads all messages from the iterator, extracts text content,
+// and parses the combined response. Checks for context cancellation between iterations.
+func collectResponse(ctx context.Context, iterator claudecode.MessageIterator) (*Result, error) {
+	var response strings.Builder
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
+		msg, err := iterator.Next(ctx)
+		if errors.Is(err, claudecode.ErrNoMoreMessages) {
+			break
+		}
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			return nil, fmt.Errorf("reading response: %w", err)
+		}
+
+		if assistant, ok := msg.(*claudecode.AssistantMessage); ok {
+			for _, block := range assistant.Content {
+				if textBlock, ok := block.(*claudecode.TextBlock); ok {
+					response.WriteString(textBlock.Text)
+				}
+			}
+		}
+	}
+
+	return parseClaudeResponse(response.String())
 }
 
 func injectionAnalysisPrompt(content string) string {
