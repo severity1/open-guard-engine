@@ -505,7 +505,7 @@ func TestCategoryFromString(t *testing.T) {
 		{"T7", types.ThreatCategoryPersistence, false},
 		{"T8", types.ThreatCategoryRecon, false},
 		{"T9", types.ThreatCategoryOutput, false},
-		{"UNKNOWN", types.ThreatCategory(""), true},
+		{"UNKNOWN", types.ThreatCategoryUnknown, false},
 		{"X99", types.ThreatCategory(""), true},
 		{"", types.ThreatCategory(""), true},
 	}
