@@ -65,6 +65,7 @@ patterns:
 - Returns all matching patterns (not short-circuit)
 - `HighestSeverity()` helper for prioritization
 - Extraction patterns capture named groups
+- Case-insensitive patterns use `(?i)` prefix (e.g., GCP metadata pattern T1-005)
 
 <!-- END AUTO-MANAGED -->
 

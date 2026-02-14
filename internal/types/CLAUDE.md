@@ -36,7 +36,7 @@ types/
 **DetectionSource** - Which layer detected:
 - `pattern`, `llm`, `agent`
 
-**HookInput/HookOutput** - JSON structures for Claude Code hooks
+**HookOutput** - JSON response structure with decision, threat details, and audit ID
 
 <!-- END AUTO-MANAGED -->
 
@@ -57,10 +57,6 @@ types/
 - `Description()` - Human-readable description
 - `IsSafetyCategory()` - Check if S1-S13
 - `IsThreatCategory()` - Check if T1-T9
-
-**Hook Input Helpers:**
-- `GetCommand()` - Extract command from Bash tool input
-- `GetFilePath()` - Extract path from Read/Write tool input
 
 <!-- END AUTO-MANAGED -->
 

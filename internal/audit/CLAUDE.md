@@ -21,7 +21,7 @@ audit/
 - `Entry` - Audit log entry with timestamp, decision, threat metadata
 
 **Key Functions:**
-- `sanitizeLogField()` - Strips ANSI escapes, control chars, replaces newlines, truncates to 4096 chars
+- `sanitizeLogField()` - Strips ANSI escapes, control chars, replaces newlines, UTF-8 safe truncation to 4096 chars
 
 <!-- END AUTO-MANAGED -->
 
@@ -34,11 +34,12 @@ audit/
 - Timestamp all events in UTC
 
 **Security Hardening:**
-- All log fields sanitized to prevent log injection
+- All log fields sanitized to prevent log injection (Event, Message, SessionID)
 - ANSI escape sequences stripped via regex
 - Control characters replaced with spaces
 - Newlines replaced with spaces
-- Max field length: 4096 characters (truncated)
+- Max field length: 4096 characters with UTF-8 safe truncation
+- Truncation uses utf8.RuneStart() walk-back to avoid splitting multi-byte sequences
 
 <!-- END AUTO-MANAGED -->
 

@@ -157,6 +157,8 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 - Agent/LLM analysis errors handled based on mode
 - Permissive mode: errors ignored, pipeline continues (fail-open)
 - Other modes: errors produce `confirm` decision with medium severity (fail-closed)
+- Generic error messages prevent information leakage (no hostnames, connection strings)
+- Detailed errors logged to stderr for operator diagnostics (all modes)
 
 **Pattern File Structure:**
 - YAML-based pattern definitions in `internal/patterns/patterns.yaml`
@@ -190,6 +192,10 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 - SSRF patterns added: AWS metadata (169.254.169.254), GCP metadata (metadata.google.internal), ECS credentials (169.254.170.2) (#19)
 - Mode-aware error handling: agent/LLM errors fail-open in permissive mode, fail-closed otherwise (#19)
 - Endpoint validation enforces http/https schemes for LLM and agent endpoints to prevent file:// and other protocol exploits (#19)
+- Error message sanitization: generic "service error" prevents leakage of internal details (hostnames, connection strings), detailed errors logged to stderr (#32)
+- SessionID sanitization added to audit logger to prevent log injection via session identifiers (#32)
+- UTF-8 safe truncation in audit logs uses utf8.RuneStart() to avoid splitting multi-byte sequences (#32)
+- GCP metadata pattern (T1-005) case-insensitive to catch obfuscation variants like Metadata.Google.Internal (#32)
 
 **Commit Style:**
 - Conventional format: `type: description (#issue)`

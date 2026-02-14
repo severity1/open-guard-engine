@@ -23,7 +23,6 @@ type Entry struct {
 	Timestamp   time.Time            `json:"timestamp"`
 	AuditID     string               `json:"audit_id"`
 	Event       string               `json:"event"`
-	ToolName    string               `json:"tool_name,omitempty"`
 	Decision    types.Decision       `json:"decision"`
 	ThreatLevel types.ThreatLevel    `json:"threat_level,omitempty"`
 	ThreatType  types.ThreatCategory `json:"threat_type,omitempty"`
@@ -78,23 +77,6 @@ func (l *Logger) Log(entry *Entry) error {
 	}
 
 	return l.encoder.Encode(entry)
-}
-
-// LogFromOutput creates and writes an audit entry from a HookOutput.
-func (l *Logger) LogFromOutput(input *types.HookInput, output *types.HookOutput) error {
-	entry := &Entry{
-		Timestamp:   time.Now().UTC(),
-		AuditID:     output.AuditID,
-		Event:       sanitizeLogField(input.Event),
-		ToolName:    sanitizeLogField(input.ToolName),
-		Decision:    output.Decision,
-		ThreatLevel: output.ThreatLevel,
-		ThreatType:  output.ThreatType,
-		Message:     sanitizeLogField(output.Message),
-		SessionID:   sanitizeLogField(input.SessionID),
-	}
-
-	return l.Log(entry)
 }
 
 // ansiEscapePattern matches ANSI escape sequences.

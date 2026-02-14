@@ -211,45 +211,6 @@ func ParseThreatLevel(s string) (ThreatLevel, error) {
 	return "", fmt.Errorf("invalid threat level: %q", s)
 }
 
-// Context contains environment information passed with hook events.
-type Context struct {
-	ProjectRoot string `json:"project_root,omitempty"`
-	Cwd         string `json:"cwd,omitempty"`
-}
-
-// HookInput represents the JSON input received from Claude Code hooks.
-type HookInput struct {
-	Event      string                 `json:"event"`
-	ToolName   string                 `json:"tool_name,omitempty"`
-	ToolInput  map[string]any `json:"tool_input,omitempty"`
-	ToolOutput string                 `json:"tool_output,omitempty"`
-	Prompt     string                 `json:"prompt,omitempty"`
-	SessionID  string                 `json:"session_id,omitempty"`
-	Context    Context                `json:"context,omitempty"`
-}
-
-// GetCommand extracts the command from tool_input for Bash tools.
-func (h *HookInput) GetCommand() string {
-	if h.ToolInput == nil {
-		return ""
-	}
-	if cmd, ok := h.ToolInput["command"].(string); ok {
-		return cmd
-	}
-	return ""
-}
-
-// GetFilePath extracts the file path from tool_input for Read/Write tools.
-func (h *HookInput) GetFilePath() string {
-	if h.ToolInput == nil {
-		return ""
-	}
-	if path, ok := h.ToolInput["file_path"].(string); ok {
-		return path
-	}
-	return ""
-}
-
 // DetectionSource indicates which layer detected the threat.
 type DetectionSource string
 
