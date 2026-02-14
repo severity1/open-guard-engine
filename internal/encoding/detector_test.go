@@ -402,28 +402,39 @@ func TestDetector_FullwidthCharacters(t *testing.T) {
 		name           string
 		content        string
 		hasObfuscation bool
+		suspicious     bool
 	}{
 		{
 			name:           "fullwidth ignore",
 			content:        "\uff49\uff47\uff4e\uff4f\uff52\uff45", // fullwidth "ignore"
 			hasObfuscation: true,
+			suspicious:     true,
 		},
 		{
 			name:           "fullwidth system",
 			content:        "\uff53\uff59\uff53\uff54\uff45\uff4d", // fullwidth "system"
 			hasObfuscation: true,
+			suspicious:     true,
 		},
 		{
 			name:           "mixed fullwidth and latin",
 			content:        "run \uff53\uff59\uff53\uff54\uff45\uff4d command", // "run system command" with fullwidth "system"
 			hasObfuscation: true,
+			suspicious:     true,
+		},
+		{
+			name:           "fullwidth hello - not injection",
+			content:        "\uff48\uff45\uff4c\uff4c\uff4f", // fullwidth "hello"
+			hasObfuscation: true,
+			suspicious:     false,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			result := d.Detect(tc.content)
-			assert.True(t, result.HasObfuscation, "expected HasObfuscation to be true for fullwidth chars")
+			assert.Equal(t, tc.hasObfuscation, result.HasObfuscation, "HasObfuscation mismatch")
+			assert.Equal(t, tc.suspicious, result.Suspicious, "Suspicious mismatch")
 		})
 	}
 }

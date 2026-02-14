@@ -40,7 +40,7 @@ patterns:
     name: gcp_metadata_ssrf
     description: GCP cloud metadata endpoint access (SSRF)
     severity: critical
-    pattern: 'metadata\.google\.internal'
+    pattern: '(?i)metadata\.google\.internal'
 
   - id: T1-006
     category: T1

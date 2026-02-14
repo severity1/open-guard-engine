@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -442,6 +443,7 @@ func TestLlamaGuardAnalyzer_ContextTimeoutOnly(t *testing.T) {
 
 	_, err := analyzer.Analyze(ctx, "test content")
 	assert.Error(t, err)
+	assert.True(t, errors.Is(err, context.DeadlineExceeded), "expected context.DeadlineExceeded, got: %v", err)
 }
 
 func TestParseResponse_UnknownDefaultsUnsafe(t *testing.T) {

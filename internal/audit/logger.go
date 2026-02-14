@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/severity1/open-guard-engine/internal/types"
 )
@@ -90,7 +91,7 @@ func (l *Logger) LogFromOutput(input *types.HookInput, output *types.HookOutput)
 		ThreatLevel: output.ThreatLevel,
 		ThreatType:  output.ThreatType,
 		Message:     sanitizeLogField(output.Message),
-		SessionID:   input.SessionID,
+		SessionID:   sanitizeLogField(input.SessionID),
 	}
 
 	return l.Log(entry)
@@ -117,7 +118,13 @@ func sanitizeLogField(s string) string {
 	}, s)
 
 	if len(s) > maxLogMessageLength {
-		s = s[:maxLogMessageLength]
+		// Walk back from the byte limit to find a valid rune boundary,
+		// avoiding truncation in the middle of a multi-byte UTF-8 sequence.
+		truncLen := maxLogMessageLength
+		for truncLen > 0 && !utf8.RuneStart(s[truncLen]) {
+			truncLen--
+		}
+		s = s[:truncLen]
 	}
 
 	return s

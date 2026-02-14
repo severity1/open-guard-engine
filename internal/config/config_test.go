@@ -549,6 +549,16 @@ func TestConfig_Validate_Endpoints(t *testing.T) {
 			agentEndpoint: "http://localhost:11434",
 			wantErr:       false,
 		},
+		{
+			name:        "invalid LLM endpoint - file scheme",
+			llmEndpoint: "file:///etc/passwd",
+			wantErr:     true,
+		},
+		{
+			name:        "valid LLM endpoint - https",
+			llmEndpoint: "https://example.com",
+			wantErr:     false,
+		},
 	}
 
 	for _, tc := range tests {

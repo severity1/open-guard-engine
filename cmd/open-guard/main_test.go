@@ -573,30 +573,54 @@ func TestAnalyzeCommand_SpecialCharacters(t *testing.T) {
 }
 
 func TestHandleAnalysisError(t *testing.T) {
-	testErr := fmt.Errorf("analysis timed out")
+	testErr := fmt.Errorf("connection refused to internal-host.corp:8443")
 
 	tests := []struct {
-		name     string
-		mode     config.Mode
-		wantNil  bool
-		wantDecision types.Decision
+		name           string
+		mode           config.Mode
+		source         types.DetectionSource
+		category       types.ThreatCategory
+		wantNil        bool
+		wantDecision   types.Decision
+		wantThreat     types.ThreatLevel
+		wantDetectedBy types.DetectionSource
 	}{
 		{
-			name:         "strict mode blocks on error",
-			mode:         config.ModeStrict,
-			wantNil:      false,
-			wantDecision: types.DecisionBlock,
+			name:           "strict mode blocks on error",
+			mode:           config.ModeStrict,
+			source:         types.DetectionSourceAgent,
+			category:       types.ThreatCategoryPromptInjection,
+			wantNil:        false,
+			wantDecision:   types.DecisionBlock,
+			wantThreat:     types.ThreatLevelMedium,
+			wantDetectedBy: types.DetectionSourceAgent,
 		},
 		{
-			name:         "confirm mode confirms on error",
-			mode:         config.ModeConfirm,
-			wantNil:      false,
-			wantDecision: types.DecisionConfirm,
+			name:           "confirm mode confirms on error",
+			mode:           config.ModeConfirm,
+			source:         types.DetectionSourceAgent,
+			category:       types.ThreatCategoryPromptInjection,
+			wantNil:        false,
+			wantDecision:   types.DecisionConfirm,
+			wantThreat:     types.ThreatLevelMedium,
+			wantDetectedBy: types.DetectionSourceAgent,
 		},
 		{
 			name:    "permissive mode continues pipeline",
 			mode:    config.ModePermissive,
+			source:  types.DetectionSourceAgent,
+			category: types.ThreatCategoryPromptInjection,
 			wantNil: true,
+		},
+		{
+			name:           "LLM source with safety category",
+			mode:           config.ModeConfirm,
+			source:         types.DetectionSourceLLM,
+			category:       types.SafetyCategoryViolentCrimes,
+			wantNil:        false,
+			wantDecision:   types.DecisionConfirm,
+			wantThreat:     types.ThreatLevelMedium,
+			wantDetectedBy: types.DetectionSourceLLM,
 		},
 	}
 
@@ -609,8 +633,8 @@ func TestHandleAnalysisError(t *testing.T) {
 			output := handleAnalysisError(
 				cfg,
 				respHandler,
-				types.DetectionSourceAgent,
-				types.ThreatCategoryPromptInjection,
+				tc.source,
+				tc.category,
 				testErr,
 			)
 
@@ -619,6 +643,12 @@ func TestHandleAnalysisError(t *testing.T) {
 			} else {
 				require.NotNil(t, output)
 				assert.Equal(t, tc.wantDecision, output.Decision)
+				assert.Equal(t, tc.wantThreat, output.ThreatLevel)
+				assert.Equal(t, tc.wantDetectedBy, output.DetectedBy)
+				// Error message must not leak internal details
+				assert.NotContains(t, output.Message, "connection refused")
+				assert.NotContains(t, output.Message, "internal-host.corp")
+				assert.Contains(t, output.Message, "Analysis unavailable")
 			}
 		})
 	}

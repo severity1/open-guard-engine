@@ -377,69 +377,107 @@ func TestEntry_AllFields(t *testing.T) {
 	assert.Equal(t, entry.SessionID, decoded.SessionID)
 }
 
+func TestSanitizeLogField_UTF8TruncationSafety(t *testing.T) {
+	// 4095 bytes of ASCII + a 3-byte UTF-8 char = 4098 bytes total.
+	// Byte-level truncation at 4096 would split the multi-byte rune.
+	input := strings.Repeat("a", 4095) + "\xe2\x9c\x93" // U+2713 check mark (3 bytes)
+	result := sanitizeLogField(input)
+
+	assert.True(t, len(result) <= maxLogMessageLength, "result should not exceed max length")
+	// Verify result is valid UTF-8 (no partial runes)
+	for i, r := range result {
+		assert.NotEqual(t, rune(0xFFFD), r, "invalid rune at position %d - truncation split a multi-byte character", i)
+	}
+}
+
 func TestLogger_LogFromOutput_SanitizesMessage(t *testing.T) {
 	tests := []struct {
 		name            string
 		message         string
 		toolName        string
 		event           string
+		sessionID       string
 		expectMessage   string
 		expectToolName  string
 		expectEvent     string
+		expectSessionID string
 	}{
 		{
-			name:           "control chars stripped",
-			message:        "threat\x00detected\x1b[31m",
-			toolName:       "Bash",
-			event:          "pre-tool",
-			expectMessage:  "threat detected",
-			expectToolName: "Bash",
-			expectEvent:    "pre-tool",
+			name:            "control chars stripped",
+			message:         "threat\x00detected\x1b[31m",
+			toolName:        "Bash",
+			event:           "pre-tool",
+			sessionID:       "session-test",
+			expectMessage:   "threat detected",
+			expectToolName:  "Bash",
+			expectEvent:     "pre-tool",
+			expectSessionID: "session-test",
 		},
 		{
-			name:           "newlines replaced with space",
-			message:        "line1\nline2\rline3",
-			toolName:       "Bash",
-			event:          "pre-tool",
-			expectMessage:  "line1 line2 line3",
-			expectToolName: "Bash",
-			expectEvent:    "pre-tool",
+			name:            "newlines replaced with space",
+			message:         "line1\nline2\rline3",
+			toolName:        "Bash",
+			event:           "pre-tool",
+			sessionID:       "session-test",
+			expectMessage:   "line1 line2 line3",
+			expectToolName:  "Bash",
+			expectEvent:     "pre-tool",
+			expectSessionID: "session-test",
 		},
 		{
-			name:           "long message truncated",
-			message:        strings.Repeat("a", 5000),
-			toolName:       "Bash",
-			event:          "pre-tool",
-			expectMessage:  strings.Repeat("a", 4096),
-			expectToolName: "Bash",
-			expectEvent:    "pre-tool",
+			name:            "long message truncated",
+			message:         strings.Repeat("a", 5000),
+			toolName:        "Bash",
+			event:           "pre-tool",
+			sessionID:       "session-test",
+			expectMessage:   strings.Repeat("a", 4096),
+			expectToolName:  "Bash",
+			expectEvent:     "pre-tool",
+			expectSessionID: "session-test",
 		},
 		{
-			name:           "clean message unchanged",
-			message:        "Normal threat message",
-			toolName:       "Bash",
-			event:          "pre-tool",
-			expectMessage:  "Normal threat message",
-			expectToolName: "Bash",
-			expectEvent:    "pre-tool",
+			name:            "clean message unchanged",
+			message:         "Normal threat message",
+			toolName:        "Bash",
+			event:           "pre-tool",
+			sessionID:       "session-test",
+			expectMessage:   "Normal threat message",
+			expectToolName:  "Bash",
+			expectEvent:     "pre-tool",
+			expectSessionID: "session-test",
 		},
 		{
-			name:           "tool name sanitized",
-			message:        "test",
-			toolName:       "Bash\x00injected",
-			event:          "pre-tool",
-			expectMessage:  "test",
-			expectToolName: "Bash injected",
-			expectEvent:    "pre-tool",
+			name:            "tool name sanitized",
+			message:         "test",
+			toolName:        "Bash\x00injected",
+			event:           "pre-tool",
+			sessionID:       "session-test",
+			expectMessage:   "test",
+			expectToolName:  "Bash injected",
+			expectEvent:     "pre-tool",
+			expectSessionID: "session-test",
 		},
 		{
-			name:           "event sanitized",
-			message:        "test",
-			toolName:       "Bash",
-			event:          "pre-tool\ninjected",
-			expectMessage:  "test",
-			expectToolName: "Bash",
-			expectEvent:    "pre-tool injected",
+			name:            "event sanitized",
+			message:         "test",
+			toolName:        "Bash",
+			event:           "pre-tool\ninjected",
+			sessionID:       "session-test",
+			expectMessage:   "test",
+			expectToolName:  "Bash",
+			expectEvent:     "pre-tool injected",
+			expectSessionID: "session-test",
+		},
+		{
+			name:            "session ID sanitized",
+			message:         "test",
+			toolName:        "Bash",
+			event:           "pre-tool",
+			sessionID:       "session\x00injected\nfake",
+			expectMessage:   "test",
+			expectToolName:  "Bash",
+			expectEvent:     "pre-tool",
+			expectSessionID: "session injected fake",
 		},
 	}
 
@@ -455,7 +493,7 @@ func TestLogger_LogFromOutput_SanitizesMessage(t *testing.T) {
 			input := &types.HookInput{
 				Event:     tc.event,
 				ToolName:  tc.toolName,
-				SessionID: "session-test",
+				SessionID: tc.sessionID,
 			}
 
 			output := &types.HookOutput{
@@ -485,6 +523,7 @@ func TestLogger_LogFromOutput_SanitizesMessage(t *testing.T) {
 			assert.Equal(t, tc.expectMessage, readEntry.Message)
 			assert.Equal(t, tc.expectToolName, readEntry.ToolName)
 			assert.Equal(t, tc.expectEvent, readEntry.Event)
+			assert.Equal(t, tc.expectSessionID, readEntry.SessionID)
 		})
 	}
 }

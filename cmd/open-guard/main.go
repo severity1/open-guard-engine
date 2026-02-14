@@ -330,7 +330,10 @@ func severityOrder(s types.ThreatLevel) int {
 // handleAnalysisError handles errors from agent/LLM analysis layers.
 // In permissive mode, errors are ignored and the pipeline continues (returns nil).
 // In other modes, errors produce a confirm decision (mode override transforms: strict -> block).
+// The generic message avoids leaking internal details (hostnames, connection strings).
 func handleAnalysisError(cfg *config.Config, respHandler *response.Handler, source types.DetectionSource, category types.ThreatCategory, analysisErr error) *types.HookOutput {
+	// Log detailed error to stderr for operator diagnostics (all modes)
+	fmt.Fprintf(os.Stderr, "open-guard: %s analysis error: %s\n", source, analysisErr.Error())
 	if cfg.Mode == config.ModePermissive {
 		return nil
 	}
@@ -339,7 +342,7 @@ func handleAnalysisError(cfg *config.Config, respHandler *response.Handler, sour
 		types.ThreatLevelMedium,
 		category,
 		source,
-		fmt.Sprintf("Analysis error: %s", analysisErr.Error()),
+		"Analysis unavailable: service error",
 	)
 }
 

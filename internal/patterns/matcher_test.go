@@ -906,9 +906,24 @@ func TestMatcher_CloudMetadataSSRF(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "GCP metadata endpoint uppercase",
+			content:  "wget http://METADATA.GOOGLE.INTERNAL/",
+			expected: true,
+		},
+		{
 			name:     "ECS credentials endpoint",
 			content:  "curl http://169.254.170.2/v2/credentials",
 			expected: true,
+		},
+		{
+			name:     "similar IP no match",
+			content:  "curl 169.254.169.253",
+			expected: false,
+		},
+		{
+			name:     "normal URL no match",
+			content:  "visit https://google.com for docs",
+			expected: false,
 		},
 	}
 
