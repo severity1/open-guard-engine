@@ -160,7 +160,7 @@ Exit conditions (ALL must be true):
 
 ## QA Criteria
 - RED phase: existing quality gates pass, new tests FAIL as expected, no regressions
-- GREEN phase: all quality gates pass (per task success criteria)
+- GREEN phase: all quality gates pass (per task success criteria). Flag tests that contribute no unique coverage or don't test what their name claims.
 - Review fix regression: all quality gates pass (per task success criteria)
 
 ## Review Handoff
@@ -217,7 +217,7 @@ When the verifier messages that QA GREEN is complete:
 4. Reviewers complete their review, challenge each other's findings, and work with the implementer to resolve issues
 5. When all reviewers converge on APPROVED, mark "Review" task complete to unblock PR
 
-The lead designs review prompts based on the changes. Use `paranoid-sentinel` for security review if available, `general-purpose` otherwise.
+The lead designs review prompts based on the changes. Use `paranoid-sentinel` for security review if available, `general-purpose` otherwise. When the diff contains AI-generated code, include a directive in reviewer prompts to identify and flag AI slop patterns.
 
 ### Review Loop
 
