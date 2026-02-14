@@ -559,6 +559,16 @@ func TestConfig_Validate_Endpoints(t *testing.T) {
 			llmEndpoint: "https://example.com",
 			wantErr:     false,
 		},
+		{
+			name:        "invalid LLM endpoint - empty host",
+			llmEndpoint: "http://",
+			wantErr:     true,
+		},
+		{
+			name:          "invalid Agent endpoint - empty host",
+			agentEndpoint: "http://",
+			wantErr:       true,
+		},
 	}
 
 	for _, tc := range tests {

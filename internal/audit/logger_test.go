@@ -330,6 +330,56 @@ func TestEntry_AllFields(t *testing.T) {
 	assert.Equal(t, entry.SessionID, decoded.SessionID)
 }
 
+func TestLogger_Log_SanitizesFields(t *testing.T) {
+	tmpDir := t.TempDir()
+	logDir := filepath.Join(tmpDir, "logs")
+
+	logger, err := NewLogger(logDir)
+	require.NoError(t, err)
+	defer func() { _ = logger.Close() }()
+
+	entry := &Entry{
+		Timestamp: time.Now().UTC(),
+		AuditID:   "test-audit-sanitize",
+		Event:     "analyze\x1b[31m\x00injected",
+		Decision:  types.DecisionBlock,
+		Message:   "threat\ndetected\r\x1b[0mnewline",
+		SessionID: "session\x00id\nnewline\x1b[32m",
+	}
+
+	err = logger.Log(entry)
+	require.NoError(t, err)
+
+	// Close to flush
+	_ = logger.Close()
+
+	// Read and verify sanitized fields
+	logPath := filepath.Join(logDir, "audit.log")
+	file, err := os.Open(logPath)
+	require.NoError(t, err)
+	defer func() { _ = file.Close() }()
+
+	var readEntry Entry
+	err = json.NewDecoder(file).Decode(&readEntry)
+	require.NoError(t, err)
+
+	// ANSI escapes, control chars, and newlines should be stripped/replaced
+	assert.NotContains(t, readEntry.Event, "\x1b[")
+	assert.NotContains(t, readEntry.Event, "\x00")
+	assert.NotContains(t, readEntry.Message, "\n")
+	assert.NotContains(t, readEntry.Message, "\r")
+	assert.NotContains(t, readEntry.Message, "\x1b[")
+	assert.NotContains(t, readEntry.SessionID, "\x00")
+	assert.NotContains(t, readEntry.SessionID, "\n")
+	assert.NotContains(t, readEntry.SessionID, "\x1b[")
+
+	// Verify content is preserved after sanitization
+	// ANSI escapes are stripped (removed), control chars and newlines become spaces
+	assert.Equal(t, "analyze injected", readEntry.Event)
+	assert.Equal(t, "threat detected newline", readEntry.Message)
+	assert.Equal(t, "session id newline", readEntry.SessionID)
+}
+
 func TestSanitizeLogField_UTF8TruncationSafety(t *testing.T) {
 	// 4095 bytes of ASCII + a 3-byte UTF-8 char = 4098 bytes total.
 	// Byte-level truncation at 4096 would split the multi-byte rune.

@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"golang.org/x/text/unicode/norm"
 )
@@ -193,15 +194,15 @@ func (d *Detector) decodeHexSuspicious(content string) (string, bool) {
 
 // decodeROT13 applies ROT13 transformation to alphabetic characters.
 func (d *Detector) decodeROT13(content string) string {
-	result := make([]rune, len(content))
-	for i, r := range content {
+	result := make([]rune, 0, utf8.RuneCountInString(content))
+	for _, r := range content {
 		switch {
 		case r >= 'a' && r <= 'z':
-			result[i] = 'a' + (r-'a'+13)%26
+			result = append(result, 'a'+(r-'a'+13)%26)
 		case r >= 'A' && r <= 'Z':
-			result[i] = 'A' + (r-'A'+13)%26
+			result = append(result, 'A'+(r-'A'+13)%26)
 		default:
-			result[i] = r
+			result = append(result, r)
 		}
 	}
 	return string(result)

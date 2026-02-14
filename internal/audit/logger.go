@@ -72,11 +72,19 @@ func (l *Logger) Log(entry *Entry) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	if entry.Timestamp.IsZero() {
-		entry.Timestamp = time.Now().UTC()
+	// Work on a copy to avoid mutating the caller's entry
+	sanitized := *entry
+
+	if sanitized.Timestamp.IsZero() {
+		sanitized.Timestamp = time.Now().UTC()
 	}
 
-	return l.encoder.Encode(entry)
+	// Sanitize user-controllable fields to prevent log injection (#22)
+	sanitized.Event = sanitizeLogField(sanitized.Event)
+	sanitized.Message = sanitizeLogField(sanitized.Message)
+	sanitized.SessionID = sanitizeLogField(sanitized.SessionID)
+
+	return l.encoder.Encode(&sanitized)
 }
 
 // ansiEscapePattern matches ANSI escape sequences.

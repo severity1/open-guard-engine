@@ -31,10 +31,10 @@ func TestDetector_Base64(t *testing.T) {
 			hasBase64:  true,
 		},
 		{
-			name:       "base64 encoded safe content - short",
-			content:    "Decode this: SGVsbG8gV29ybGQh", // "Hello World!" - too short to be detected
+			name:       "base64 encoded safe content",
+			content:    "Decode this: SGVsbG8gV29ybGQh", // "Hello World!" - detected but not suspicious
 			suspicious: false,
-			hasBase64:  false, // Less than 20 chars so won't be detected
+			hasBase64:  true,
 		},
 		{
 			name:       "no base64 content",

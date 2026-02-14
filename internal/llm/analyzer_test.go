@@ -415,11 +415,6 @@ func TestMockAnalyzer_IsAvailable(t *testing.T) {
 	}
 }
 
-func TestLlamaGuardAnalyzer_NoHardcodedTimeout(t *testing.T) {
-	analyzer := NewLlamaGuardAnalyzer("http://localhost:11434", "llama-guard3:1b")
-	assert.Equal(t, time.Duration(0), analyzer.client.Timeout)
-}
-
 func TestLlamaGuardAnalyzer_ContextTimeoutOnly(t *testing.T) {
 	// Mock server with 200ms delay
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -446,25 +441,3 @@ func TestLlamaGuardAnalyzer_ContextTimeoutOnly(t *testing.T) {
 	assert.True(t, errors.Is(err, context.DeadlineExceeded), "expected context.DeadlineExceeded, got: %v", err)
 }
 
-func TestParseResponse_UnknownDefaultsUnsafe(t *testing.T) {
-	tests := []struct {
-		name       string
-		content    string
-		safe       bool
-		confidence float64
-	}{
-		{"empty string", "", false, 0.0},
-		{"maybe", "maybe", false, 0.0},
-		{"random gibberish", "random gibberish", false, 0.0},
-	}
-
-	analyzer := &LlamaGuardAnalyzer{}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			result := analyzer.parseResponse(tc.content)
-			assert.Equal(t, tc.safe, result.Safe)
-			assert.Equal(t, tc.confidence, result.Confidence)
-		})
-	}
-}

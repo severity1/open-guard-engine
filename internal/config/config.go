@@ -110,6 +110,9 @@ func validateEndpoint(endpoint, fieldName string) error {
 	if u.Scheme != "http" && u.Scheme != "https" {
 		return fmt.Errorf("invalid %s endpoint: scheme must be http or https, got %q", fieldName, u.Scheme)
 	}
+	if u.Host == "" {
+		return fmt.Errorf("invalid %s endpoint: host cannot be empty", fieldName)
+	}
 	return nil
 }
 

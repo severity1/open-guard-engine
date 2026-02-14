@@ -196,6 +196,7 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 - SessionID sanitization added to audit logger to prevent log injection via session identifiers (#32)
 - UTF-8 safe truncation in audit logs uses utf8.RuneStart() to avoid splitting multi-byte sequences (#32)
 - GCP metadata pattern (T1-005) case-insensitive to catch obfuscation variants like Metadata.Google.Internal (#32)
+- Removed hook-specific types (HookInput, Context, GetCommand/GetFilePath helpers) and LogFromOutput method from audit logger to simplify API surface (a78daa8)
 
 **Commit Style:**
 - Conventional format: `type: description (#issue)`

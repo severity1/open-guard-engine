@@ -3,7 +3,7 @@
 <!-- AUTO-MANAGED: module-description -->
 ## Purpose
 
-Shared type definitions for the open-guard security engine. Defines the core domain types: decisions, threat levels, categories, detection sources, and hook I/O structures.
+Shared type definitions for the open-guard security engine. Defines the core domain types: decisions, threat levels, categories, detection sources, and JSON response structure.
 
 <!-- END AUTO-MANAGED -->
 

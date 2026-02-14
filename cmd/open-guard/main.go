@@ -333,7 +333,7 @@ func severityOrder(s types.ThreatLevel) int {
 // The generic message avoids leaking internal details (hostnames, connection strings).
 func handleAnalysisError(cfg *config.Config, respHandler *response.Handler, source types.DetectionSource, category types.ThreatCategory, analysisErr error) *types.HookOutput {
 	// Log detailed error to stderr for operator diagnostics (all modes)
-	fmt.Fprintf(os.Stderr, "open-guard: %s analysis error: %s\n", source, analysisErr.Error())
+	fmt.Fprintf(os.Stderr, "open-guard: %s analysis error: %s\n", source, analysisErr)
 	if cfg.Mode == config.ModePermissive {
 		return nil
 	}
