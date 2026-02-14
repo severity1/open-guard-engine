@@ -1,6 +1,6 @@
 module github.com/severity1/open-guard-engine
 
-go 1.22
+go 1.24.0
 
 require (
 	github.com/google/uuid v1.6.0
@@ -15,4 +15,5 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
+	golang.org/x/text v0.34.0 // indirect
 )
