@@ -280,7 +280,7 @@ Output is JSON with decision (allow/block/confirm) and threat details.`,
 
 					result, err := contentAnalyzer.Analyze(llmCtx, analysisContent)
 					if err != nil {
-						if output := handleAnalysisError(cfg, respHandler, types.DetectionSourceLLM, types.SafetyCategoryViolentCrimes, err); output != nil {
+						if output := handleAnalysisError(cfg, respHandler, types.DetectionSourceLLM, types.ThreatCategoryUnknown, err); output != nil {
 							return outputJSON(cmd, output)
 						}
 					} else if !result.Safe {
@@ -348,12 +348,12 @@ func handleAnalysisError(cfg *config.Config, respHandler *response.Handler, sour
 
 func mapCategory(categories []string) types.ThreatCategory {
 	if len(categories) == 0 {
-		return types.SafetyCategoryViolentCrimes // S1 default for unknown LLM output
+		return types.ThreatCategoryUnknown // Default for unknown LLM output
 	}
 	cat := categories[0]
 	parsed, err := types.ParseThreatCategory(cat)
 	if err != nil {
-		return types.SafetyCategoryViolentCrimes // S1 fallback for unrecognized categories
+		return types.ThreatCategoryUnknown // Fallback for unrecognized categories
 	}
 	return parsed
 }

@@ -390,7 +390,6 @@ func TestParseThreatCategory_Invalid(t *testing.T) {
 		{"zero S", "S0"},
 		{"out of range S", "S14"},
 		{"empty", ""},
-		{"unknown string", "unknown"},
 	}
 
 	for _, tc := range tests {
@@ -501,6 +500,30 @@ func TestThreatCategory_JSONUnmarshal_InvalidJSON(t *testing.T) {
 	var cat ThreatCategory
 	err := json.Unmarshal([]byte(`{invalid`), &cat)
 	assert.Error(t, err)
+}
+
+func TestThreatCategoryUnknown(t *testing.T) {
+	t.Run("String", func(t *testing.T) {
+		assert.Equal(t, "unknown", ThreatCategoryUnknown.String())
+	})
+
+	t.Run("Description", func(t *testing.T) {
+		assert.Equal(t, "Analysis unavailable", ThreatCategoryUnknown.Description())
+	})
+
+	t.Run("IsSafetyCategory", func(t *testing.T) {
+		assert.False(t, ThreatCategoryUnknown.IsSafetyCategory())
+	})
+
+	t.Run("IsThreatCategory", func(t *testing.T) {
+		assert.False(t, ThreatCategoryUnknown.IsThreatCategory())
+	})
+
+	t.Run("ParseThreatCategory", func(t *testing.T) {
+		cat, err := ParseThreatCategory("unknown")
+		require.NoError(t, err)
+		assert.Equal(t, ThreatCategoryUnknown, cat)
+	})
 }
 
 func TestThreatCategory_JSONMarshal(t *testing.T) {

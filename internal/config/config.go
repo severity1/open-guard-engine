@@ -88,10 +88,10 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid agent provider: %q (must be claude or ollama)", c.Agent.Provider)
 	}
 
-	if err := validateEndpoint(c.LLM.Endpoint, "llm.endpoint"); err != nil {
+	if err := validateEndpoint(c.LLM.Endpoint, "llm"); err != nil {
 		return err
 	}
-	if err := validateEndpoint(c.Agent.Endpoint, "agent.endpoint"); err != nil {
+	if err := validateEndpoint(c.Agent.Endpoint, "agent"); err != nil {
 		return err
 	}
 

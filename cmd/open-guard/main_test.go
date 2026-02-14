@@ -281,12 +281,12 @@ func TestMapCategory(t *testing.T) {
 		categories []string
 		expected   types.ThreatCategory
 	}{
-		{"empty categories", []string{}, types.SafetyCategoryViolentCrimes},
+		{"empty categories", []string{}, types.ThreatCategoryUnknown},
 		{"single S category", []string{"S1"}, types.SafetyCategoryViolentCrimes},
 		{"lowercase s", []string{"s5"}, types.SafetyCategoryDefamation},
 		{"multiple categories", []string{"S1", "S5", "S10"}, types.SafetyCategoryViolentCrimes},
 		{"non-S category", []string{"T5"}, types.ThreatCategoryPromptInjection},
-		{"unknown category", []string{"X99"}, types.SafetyCategoryViolentCrimes},
+		{"unknown category", []string{"X99"}, types.ThreatCategoryUnknown},
 	}
 
 	for _, tc := range tests {
@@ -613,10 +613,10 @@ func TestHandleAnalysisError(t *testing.T) {
 			wantNil: true,
 		},
 		{
-			name:           "LLM source with safety category",
+			name:           "LLM source with unknown category",
 			mode:           config.ModeConfirm,
 			source:         types.DetectionSourceLLM,
-			category:       types.SafetyCategoryViolentCrimes,
+			category:       types.ThreatCategoryUnknown,
 			wantNil:        false,
 			wantDecision:   types.DecisionConfirm,
 			wantThreat:     types.ThreatLevelMedium,
