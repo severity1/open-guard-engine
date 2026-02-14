@@ -514,20 +514,22 @@ func TestClaudeAnalyzer_BuildEnv(t *testing.T) {
 		name     string
 		provider string
 		endpoint string
-		wantNil  bool
 		wantEnv  map[string]string
 	}{
 		{
-			name:     "claude provider returns nil",
+			name:     "claude provider returns CLAUDECODE unset only",
 			provider: "claude",
 			endpoint: "",
-			wantNil:  true,
+			wantEnv: map[string]string{
+				"CLAUDECODE": "",
+			},
 		},
 		{
-			name:     "ollama provider returns env map",
+			name:     "ollama provider returns env map with CLAUDECODE",
 			provider: "ollama",
 			endpoint: "http://localhost:11434",
 			wantEnv: map[string]string{
+				"CLAUDECODE":           "",
 				"ANTHROPIC_BASE_URL":   "http://localhost:11434",
 				"ANTHROPIC_AUTH_TOKEN": "ollama",
 				"ANTHROPIC_API_KEY":    "",
@@ -538,6 +540,7 @@ func TestClaudeAnalyzer_BuildEnv(t *testing.T) {
 			provider: "ollama",
 			endpoint: "http://custom:8080",
 			wantEnv: map[string]string{
+				"CLAUDECODE":           "",
 				"ANTHROPIC_BASE_URL":   "http://custom:8080",
 				"ANTHROPIC_AUTH_TOKEN": "ollama",
 				"ANTHROPIC_API_KEY":    "",
@@ -549,11 +552,6 @@ func TestClaudeAnalyzer_BuildEnv(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			analyzer := NewClaudeAnalyzer("test-model", ".", tt.provider, tt.endpoint)
 			env := analyzer.buildEnv()
-
-			if tt.wantNil {
-				assert.Nil(t, env)
-				return
-			}
 
 			require.NotNil(t, env)
 			for key, want := range tt.wantEnv {

@@ -66,17 +66,19 @@ func NewClaudeAnalyzer(model, projectRoot, provider, endpoint string) *ClaudeAna
 }
 
 // buildEnv returns environment variables for the subprocess.
-// For "ollama" provider, returns a map routing Claude Code SDK requests
-// to the local Ollama endpoint. For "claude" provider, returns nil (no override).
+// Always unsets CLAUDECODE to allow SDK usage from within Claude Code sessions
+// (hooks, plugins). See: https://github.com/severity1/claude-agent-sdk-go/issues/102
+// For "ollama" provider, also routes requests to the local Ollama endpoint.
 func (a *ClaudeAnalyzer) buildEnv() map[string]string {
-	if a.provider != "ollama" {
-		return nil
+	env := map[string]string{
+		"CLAUDECODE": "", // Allow nested SDK invocation from Claude Code hooks
 	}
-	return map[string]string{
-		"ANTHROPIC_BASE_URL":   a.endpoint,
-		"ANTHROPIC_AUTH_TOKEN": "ollama",
-		"ANTHROPIC_API_KEY":    "",
+	if a.provider == "ollama" {
+		env["ANTHROPIC_BASE_URL"] = a.endpoint
+		env["ANTHROPIC_AUTH_TOKEN"] = "ollama"
+		env["ANTHROPIC_API_KEY"] = ""
 	}
+	return env
 }
 
 // Analyze checks if content contains prompt injection attempts.
