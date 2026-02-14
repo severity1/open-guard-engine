@@ -18,9 +18,10 @@ audit/
 
 **Key Types:**
 - `Logger` - Audit event logger with structured JSON output
-- `Entry` - Audit log entry with timestamp, decision, threat metadata
+- `Entry` - Audit log entry with timestamp, audit ID, event, decision, threat metadata, optional SessionID
 
 **Key Functions:**
+- `Log(*Entry)` - Write audit entry with automatic timestamp and field sanitization
 - `sanitizeLogField()` - Strips ANSI escapes, control chars, replaces newlines, UTF-8 safe truncation to 4096 chars
 
 <!-- END AUTO-MANAGED -->
