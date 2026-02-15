@@ -148,7 +148,7 @@ patterns:
     name: etc_write
     description: Writing to /etc directory
     severity: critical
-    pattern: '/etc/'
+    pattern: '(?i)(tee|cp|mv|install)\b.*?/etc/|>>?\s*/etc/|sed\s+-i\s+.*?/etc/'
 
   - id: T4-002
     category: T4

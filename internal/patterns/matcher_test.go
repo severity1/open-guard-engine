@@ -138,8 +138,8 @@ func TestMatcher_T4_Filesystem(t *testing.T) {
 		content  string
 		expected bool
 	}{
-		{"write to etc", "Write", "/etc/passwd", true},
-		{"write to etc hosts", "Write", "/etc/hosts", true},
+		{"bare etc passwd path", "Write", "/etc/passwd", false},
+		{"bare etc hosts path", "Write", "/etc/hosts", false},
 		{"symlink attack", "Bash", "ln -s /etc/passwd ./passwd", true},
 		{"rm rf root", "Bash", "rm -rf /", true},
 		{"rm rf home", "Bash", "rm -rf ~/*", true},
@@ -147,7 +147,9 @@ func TestMatcher_T4_Filesystem(t *testing.T) {
 		{"write to project", "Write", "/home/user/project/main.go", false},
 		{"rm project file", "Bash", "rm ./temp.txt", false},
 		{"normal chmod", "Bash", "chmod +x script.sh", false},
-		{"etc path in command", "Bash", "cat /etc/passwd", true},
+		{"cat etc passwd", "Bash", "cat /etc/passwd", false},
+		{"cp to etc hosts", "Bash", "cp evil /etc/hosts", true},
+		{"redirect to etc", "Bash", "echo x > /etc/resolv.conf", true},
 	}
 
 	for _, tc := range tests {
@@ -160,6 +162,55 @@ func TestMatcher_T4_Filesystem(t *testing.T) {
 				}
 			}
 			assert.Equal(t, tc.expected, hasT4, "tool: %s, content: %s", tc.tool, tc.content)
+		})
+	}
+}
+
+// T4-001: /etc/ write operations (scoped to write commands only)
+func TestMatcher_T4001_EtcWrite(t *testing.T) {
+	m, err := NewMatcher()
+	require.NoError(t, err)
+
+	tests := []struct {
+		name     string
+		content  string
+		expected bool
+	}{
+		// Should match T4-001 (write operations targeting /etc/)
+		{"cp to etc hosts", "cp malicious.conf /etc/hosts", true},
+		{"mv to etc systemd", "mv backdoor /etc/systemd/", true},
+		{"tee to etc passwd", "tee /etc/passwd", true},
+		{"install to etc", "install -m 644 config /etc/myapp/", true},
+		{"redirect to etc", "echo x > /etc/resolv.conf", true},
+		{"append to etc", "echo x >> /etc/hosts", true},
+		{"sed in-place etc", "sed -i 's/old/new/' /etc/nginx/nginx.conf", true},
+		{"cp force to etc", "cp -f payload /etc/cron.d/", true},
+		{"redirect no space", "echo x>/etc/hosts", true},
+		{"append no space", "echo x>>/etc/hosts", true},
+
+		// Should NOT match T4-001 (read operations or documentation)
+		{"cat etc passwd", "cat /etc/passwd", false},
+		{"grep etc passwd", "grep root /etc/passwd", false},
+		{"ls etc", "ls /etc/", false},
+		{"head etc hosts", "head -n 5 /etc/hosts", false},
+		{"tail etc syslog", "tail -f /etc/syslog", false},
+		{"less etc fstab", "less /etc/fstab", false},
+		{"stat etc passwd", "stat /etc/passwd", false},
+		{"doc reference etc", "config is stored in /etc/myapp/config.yaml", false},
+		{"comment reference etc", "# see /etc/nginx/ for details", false},
+		{"sed without i flag", "sed 's/old/new/' /etc/hosts", false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			results := m.Match(tc.content)
+			hasT4001 := false
+			for _, r := range results {
+				if r.PatternID == "T4-001" {
+					hasT4001 = true
+				}
+			}
+			assert.Equal(t, tc.expected, hasT4001, "content: %s", tc.content)
 		})
 	}
 }
