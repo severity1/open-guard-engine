@@ -171,6 +171,8 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 ## Git Insights
 
 **Recent Design Decisions:**
+- Test target separation: unit tests (make test) exclude integration tests for faster local dev, integration tests require explicit targets (df0501b)
+- Integration test timeout increased from 5m to 30m to accommodate slower LLM/agent tests (df0501b)
 - Extracted collectResponse() for testability and improved context cancellation handling (PR #4)
 - Race condition fix: replaced setupOllamaEnv (parent env mutation) with buildEnv (subprocess env map) to eliminate shared state mutation (PR #8)
 - buildEnv() returns new map each call to ensure concurrent access safety and isolation
