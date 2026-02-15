@@ -245,6 +245,16 @@ func TestParseClaudeResponse_Comprehensive(t *testing.T) {
 		{"empty response", "", false, "", true},
 		{"unexpected format", "UNKNOWN", false, "", true},
 		{"random text", "Hello world", false, "", true},
+
+		// Lenient parsing - keyword in body (Ollama models add preamble)
+		{"SAFE keyword in body", "Based on my analysis, this is SAFE", true, "", false},
+		{"SAFE on later line", "The input appears benign.\n\nSAFE", true, "", false},
+		{"SAFE with verbose preamble", "Let me analyze this carefully.\n\nSAFE", true, "", false},
+		{"INJECTION keyword in body", "I believe this is an INJECTION: bypass attempt", false, "BYPASS ATTEMPT", false},
+		{"INJECTION on later line", "After review:\nINJECTION: attempts to override", false, "ATTEMPTS TO OVERRIDE", false},
+		{"INJECTION takes priority over SAFE", "This mentions SAFE but is really INJECTION: sneaky", false, "SNEAKY", false},
+		// Error cases - no keywords
+		{"no keywords verbose", "I don't know what to say about this input", false, "", true},
 	}
 
 	for _, tt := range tests {
@@ -322,6 +332,7 @@ func TestInjectionAnalysisPrompt_Structure(t *testing.T) {
 	assert.Contains(t, prompt, "BEGIN_UNTRUSTED")
 	assert.Contains(t, prompt, "END_UNTRUSTED")
 	assert.Contains(t, prompt, "brief reason")
+	assert.Contains(t, prompt, "CRITICAL RESPONSE FORMAT")
 }
 
 // --- Tests for #14: Context cancellation in iterator loop ---
