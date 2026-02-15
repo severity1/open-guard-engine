@@ -171,7 +171,8 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 ## Git Insights
 
 **Recent Design Decisions:**
-- Pattern anchor fixes: removed ^ from T4-001 to match /etc/ mid-command, added (?m) multiline flag to T5-003 for start-of-line system: matching (46c9a63)
+- T4-001 scoped to write operations only: changed from path anchor to command matching (tee|cp|mv|install + /etc/ OR redirect/append to /etc/ OR sed -i on /etc/) to prevent false positives on read operations like cat/grep/ls (#33)
+- T5-003 multiline flag: added (?im) to enable start-of-line ^ matching for system: override detection (ef8bfbd)
 - ThreatCategoryUnavailable added to distinguish service errors from unrecognized threat categories, LLM errors now use Unavailable instead of Unknown (46c9a63)
 - extractInjectionResult() preserves original casing in reasons, uses TrimLeft for colon stripping to handle double colons (46c9a63)
 - LLM response body size limit: maxResponseBodySize constant (1MB) enforced with io.LimitReader on all decode paths (success, error, IsAvailable) (46c9a63)
