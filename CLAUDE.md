@@ -171,6 +171,11 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 ## Git Insights
 
 **Recent Design Decisions:**
+- Pattern anchor fixes: removed ^ from T4-001 to match /etc/ mid-command, added (?m) multiline flag to T5-003 for start-of-line system: matching (46c9a63)
+- ThreatCategoryUnavailable added to distinguish service errors from unrecognized threat categories, LLM errors now use Unavailable instead of Unknown (46c9a63)
+- extractInjectionResult() preserves original casing in reasons, uses TrimLeft for colon stripping to handle double colons (46c9a63)
+- LLM response body size limit: maxResponseBodySize constant (1MB) enforced with io.LimitReader on all decode paths (success, error, IsAvailable) (46c9a63)
+- Compile-time interface check added to llm.MockAnalyzer for consistency with other mock implementations (46c9a63)
 - Lenient agent response parsing to handle Ollama models that add preamble text before keywords (640dbc0)
 - parseClaudeResponse() searches for keywords anywhere in response as fallback, prioritizes INJECTION before SAFE for fail-closed behavior (640dbc0)
 - extractInjectionResult() helper extracts reason from INJECTION responses (640dbc0)

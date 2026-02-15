@@ -58,7 +58,7 @@ The analyzer runs in a hardened sandbox:
 - Fast path: checks if response starts with expected keyword
 - Fallback: searches entire response, prioritizes INJECTION before SAFE (fail-closed)
 - Case-insensitive matching with `strings.ToUpper()`
-- `extractInjectionResult()` helper extracts reason from INJECTION responses
+- `extractInjectionResult()` helper extracts reason from INJECTION responses, preserves original casing, uses TrimLeft for colon handling
 - Unknown responses (no keywords found) treated as errors
 
 **Prompt Engineering:**

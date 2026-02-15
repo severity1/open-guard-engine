@@ -26,6 +26,7 @@ llm/
 - Uses Ollama `/api/chat` endpoint
 - Non-streaming mode for simplicity
 - Timeout controlled via context (no hardcoded HTTP client timeout)
+- Response body size limited to 1MB (maxResponseBodySize constant) via io.LimitReader on all decode paths
 
 <!-- END AUTO-MANAGED -->
 
@@ -44,7 +45,7 @@ llm/
 
 **Interface Design:**
 - `Analyzer` interface for testability
-- `mock.go` provides test double
+- `mock.go` provides test double with compile-time interface check
 
 <!-- END AUTO-MANAGED -->
 
