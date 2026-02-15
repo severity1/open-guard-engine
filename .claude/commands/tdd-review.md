@@ -215,6 +215,7 @@ Determine if the code can proceed.
 make test                    # Must pass
 make lint                    # Must pass
 make test-integration        # Should pass
+make test-integration-all    # Full integration (requires Ollama + Claude)
 ```
 
 **Output Decision:**
@@ -244,7 +245,9 @@ If the user requests fixes, apply them systematically.
 
 **After all fixes:**
 ```bash
-make test                    # Full test suite
+make test                    # Unit tests
+make test-integration        # Pattern integration tests
+make test-integration-all    # Full integration tests
 make lint                    # Full lint
 ```
 

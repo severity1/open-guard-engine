@@ -282,11 +282,13 @@ The `analyze` command outputs JSON to stdout:
 ## Development
 
 ```bash
-make test          # Run tests
-make test-coverage # Coverage report
-make lint          # Run linter
-make bench         # Run benchmarks
-make demo          # Regenerate demo.gif (requires vhs + ffmpeg)
+make test               # Run unit tests (fast, no external deps)
+make test-integration   # Run pattern integration tests
+make test-integration-all  # Run all integration tests (requires Ollama + Claude)
+make test-coverage      # Unit test coverage report
+make lint               # Run linter
+make bench              # Run benchmarks
+make demo               # Regenerate demo.gif (requires vhs + ffmpeg)
 ```
 
 ## License

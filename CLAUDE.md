@@ -24,11 +24,11 @@ make build-all          # Build for all platforms (linux, darwin, windows)
 make install            # Install to GOPATH/bin
 
 # Test
-make test               # Run all unit tests
-make test-coverage      # Run tests with coverage report
+make test               # Run unit tests (excludes integration)
+make test-coverage      # Run unit tests with coverage report
 make test-integration   # Run pattern-only integration tests (no external deps)
 make test-integration-all  # Run all integration tests (requires Ollama + Claude)
-make bench              # Run benchmarks
+make bench              # Run benchmarks (excludes integration)
 
 # Quality
 make lint               # Run golangci-lint
