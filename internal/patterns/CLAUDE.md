@@ -66,8 +66,8 @@ patterns:
 - `HighestSeverity()` helper for prioritization
 - Extraction patterns capture named groups
 - Case-insensitive patterns use `(?i)` prefix (e.g., GCP metadata pattern T1-005)
-- Multiline patterns use `(?m)` flag to enable start-of-line ^ matching (e.g., T5-003 system: override)
-- Path patterns without anchors match anywhere in content (e.g., T4-001 /etc/ matches mid-command)
+- Multiline patterns use `(?im)` flag to enable start-of-line ^ matching (e.g., T5-003 system: override)
+- Scoped patterns match specific operations (e.g., T4-001 /etc/ write commands only, not read operations)
 
 <!-- END AUTO-MANAGED -->
 
