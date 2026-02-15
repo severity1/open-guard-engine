@@ -171,6 +171,9 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 ## Git Insights
 
 **Recent Design Decisions:**
+- Lenient agent response parsing to handle Ollama models that add preamble text before keywords (640dbc0)
+- parseClaudeResponse() searches for keywords anywhere in response as fallback, prioritizes INJECTION before SAFE for fail-closed behavior (640dbc0)
+- extractInjectionResult() helper extracts reason from INJECTION responses (640dbc0)
 - Test target separation: unit tests (make test) exclude integration tests for faster local dev, integration tests require explicit targets (df0501b)
 - Integration test timeout increased from 5m to 30m to accommodate slower LLM/agent tests (df0501b)
 - Extracted collectResponse() for testability and improved context cancellation handling (PR #4)
