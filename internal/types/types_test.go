@@ -129,54 +129,6 @@ func TestThreatCategory_String(t *testing.T) {
 	}
 }
 
-func TestHookInput_JSONUnmarshal(t *testing.T) {
-	input := `{
-		"event": "pre-tool",
-		"tool_name": "Bash",
-		"tool_input": {
-			"command": "curl https://example.com"
-		},
-		"session_id": "abc123",
-		"context": {
-			"project_root": "/home/user/project"
-		}
-	}`
-
-	var hi HookInput
-	err := json.Unmarshal([]byte(input), &hi)
-	require.NoError(t, err)
-
-	assert.Equal(t, "pre-tool", hi.Event)
-	assert.Equal(t, "Bash", hi.ToolName)
-	assert.Equal(t, "abc123", hi.SessionID)
-	assert.Equal(t, "/home/user/project", hi.Context.ProjectRoot)
-
-	// Check tool_input
-	require.NotNil(t, hi.ToolInput)
-	cmd, ok := hi.ToolInput["command"]
-	require.True(t, ok)
-	assert.Equal(t, "curl https://example.com", cmd)
-}
-
-func TestHookInput_JSONUnmarshal_UserPromptSubmit(t *testing.T) {
-	input := `{
-		"event": "user-prompt-submit",
-		"prompt": "Please delete all files",
-		"session_id": "xyz789",
-		"context": {
-			"project_root": "/tmp/test"
-		}
-	}`
-
-	var hi HookInput
-	err := json.Unmarshal([]byte(input), &hi)
-	require.NoError(t, err)
-
-	assert.Equal(t, "user-prompt-submit", hi.Event)
-	assert.Equal(t, "Please delete all files", hi.Prompt)
-	assert.Equal(t, "xyz789", hi.SessionID)
-}
-
 func TestHookOutput_JSONMarshal(t *testing.T) {
 	output := HookOutput{
 		Decision:    DecisionBlock,
@@ -215,20 +167,6 @@ func TestHookOutput_AllowOnly(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "allow", result["decision"])
-}
-
-func TestContext_JSONUnmarshal(t *testing.T) {
-	input := `{
-		"project_root": "/home/user/myproject",
-		"cwd": "/home/user/myproject/src"
-	}`
-
-	var ctx Context
-	err := json.Unmarshal([]byte(input), &ctx)
-	require.NoError(t, err)
-
-	assert.Equal(t, "/home/user/myproject", ctx.ProjectRoot)
-	assert.Equal(t, "/home/user/myproject/src", ctx.Cwd)
 }
 
 func TestThreatLevel_JSONUnmarshal_AllValues(t *testing.T) {
@@ -397,106 +335,6 @@ func TestThreatCategory_EdgeCases(t *testing.T) {
 	}
 }
 
-func TestHookInput_GetCommand(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    HookInput
-		expected string
-	}{
-		{
-			name: "valid command",
-			input: HookInput{
-				ToolInput: map[string]any{"command": "ls -la"},
-			},
-			expected: "ls -la",
-		},
-		{
-			name: "nil tool_input",
-			input: HookInput{
-				ToolInput: nil,
-			},
-			expected: "",
-		},
-		{
-			name: "empty tool_input",
-			input: HookInput{
-				ToolInput: map[string]any{},
-			},
-			expected: "",
-		},
-		{
-			name: "command not a string",
-			input: HookInput{
-				ToolInput: map[string]any{"command": 123},
-			},
-			expected: "",
-		},
-		{
-			name: "different key",
-			input: HookInput{
-				ToolInput: map[string]any{"cmd": "ls"},
-			},
-			expected: "",
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.expected, tc.input.GetCommand())
-		})
-	}
-}
-
-func TestHookInput_GetFilePath(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    HookInput
-		expected string
-	}{
-		{
-			name: "valid file_path",
-			input: HookInput{
-				ToolInput: map[string]any{"file_path": "/home/user/file.txt"},
-			},
-			expected: "/home/user/file.txt",
-		},
-		{
-			name: "nil tool_input",
-			input: HookInput{
-				ToolInput: nil,
-			},
-			expected: "",
-		},
-		{
-			name: "empty tool_input",
-			input: HookInput{
-				ToolInput: map[string]any{},
-			},
-			expected: "",
-		},
-		{
-			name: "file_path not a string",
-			input: HookInput{
-				ToolInput: map[string]any{"file_path": 456},
-			},
-			expected: "",
-		},
-		{
-			name: "different key",
-			input: HookInput{
-				ToolInput: map[string]any{"path": "/home/user"},
-			},
-			expected: "",
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.expected, tc.input.GetFilePath())
-		})
-	}
-}
-
 func TestDetectionSource_Constants(t *testing.T) {
 	// Verify all detection source constants have expected values
 	assert.Equal(t, DetectionSource("pattern"), DetectionSourcePattern)
@@ -552,7 +390,6 @@ func TestParseThreatCategory_Invalid(t *testing.T) {
 		{"zero S", "S0"},
 		{"out of range S", "S14"},
 		{"empty", ""},
-		{"unknown string", "unknown"},
 	}
 
 	for _, tc := range tests {
@@ -663,6 +500,54 @@ func TestThreatCategory_JSONUnmarshal_InvalidJSON(t *testing.T) {
 	var cat ThreatCategory
 	err := json.Unmarshal([]byte(`{invalid`), &cat)
 	assert.Error(t, err)
+}
+
+func TestThreatCategoryUnknown(t *testing.T) {
+	t.Run("String", func(t *testing.T) {
+		assert.Equal(t, "unknown", ThreatCategoryUnknown.String())
+	})
+
+	t.Run("Description", func(t *testing.T) {
+		assert.Equal(t, "Unclassified threat", ThreatCategoryUnknown.Description())
+	})
+
+	t.Run("IsSafetyCategory", func(t *testing.T) {
+		assert.False(t, ThreatCategoryUnknown.IsSafetyCategory())
+	})
+
+	t.Run("IsThreatCategory", func(t *testing.T) {
+		assert.False(t, ThreatCategoryUnknown.IsThreatCategory())
+	})
+
+	t.Run("ParseThreatCategory", func(t *testing.T) {
+		cat, err := ParseThreatCategory("unknown")
+		require.NoError(t, err)
+		assert.Equal(t, ThreatCategoryUnknown, cat)
+	})
+}
+
+func TestThreatCategoryUnavailable(t *testing.T) {
+	t.Run("String", func(t *testing.T) {
+		assert.Equal(t, "unavailable", ThreatCategoryUnavailable.String())
+	})
+
+	t.Run("Description", func(t *testing.T) {
+		assert.Equal(t, "Analysis unavailable", ThreatCategoryUnavailable.Description())
+	})
+
+	t.Run("IsSafetyCategory", func(t *testing.T) {
+		assert.False(t, ThreatCategoryUnavailable.IsSafetyCategory())
+	})
+
+	t.Run("IsThreatCategory", func(t *testing.T) {
+		assert.False(t, ThreatCategoryUnavailable.IsThreatCategory())
+	})
+
+	t.Run("ParseThreatCategory", func(t *testing.T) {
+		cat, err := ParseThreatCategory("unavailable")
+		require.NoError(t, err)
+		assert.Equal(t, ThreatCategoryUnavailable, cat)
+	})
 }
 
 func TestThreatCategory_JSONMarshal(t *testing.T) {

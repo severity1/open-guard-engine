@@ -25,6 +25,7 @@ agent/
 
 **Key Functions:**
 - `collectResponse()` - Extracts text from iterator with context cancellation between iterations
+- `extractInjectionResult()` - Parses INJECTION response and extracts reason
 
 **Security Isolation:**
 The analyzer runs in a hardened sandbox:
@@ -40,8 +41,9 @@ The analyzer runs in a hardened sandbox:
 
 **Provider Pattern:**
 - `provider` field: `"claude"` (default) or `"ollama"`
-- Ollama env vars passed to subprocess via `buildEnv()` and `claudecode.WithEnv()`
-- Returns env map for subprocess, not parent process mutation (avoids race conditions)
+- `buildEnv()` always unsets `CLAUDECODE` env var to enable nested SDK invocation from Claude Code hooks/plugins (#102)
+- Ollama provider additionally sets `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_API_KEY`
+- Returns new env map each call for subprocess isolation (avoids race conditions)
 
 **Context & Timeout Handling:**
 - `Analyze()` accepts context for timeout and cancellation
@@ -52,8 +54,12 @@ The analyzer runs in a hardened sandbox:
 
 **Response Parsing:**
 - Expected format: `"SAFE"` or `"INJECTION: reason"`
+- Lenient parsing: searches for keywords anywhere in response (fallback for Ollama models with preamble)
+- Fast path: checks if response starts with expected keyword
+- Fallback: searches entire response, prioritizes INJECTION before SAFE (fail-closed)
 - Case-insensitive matching with `strings.ToUpper()`
-- Unknown responses treated as errors
+- `extractInjectionResult()` helper extracts reason from INJECTION responses, preserves original casing, uses TrimLeft for colon handling
+- Unknown responses (no keywords found) treated as errors
 
 **Prompt Engineering:**
 - Structured prompt with `<<<BEGIN_UNTRUSTED>>>` markers

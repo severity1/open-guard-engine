@@ -6,18 +6,23 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/severity1/open-guard-engine/internal/types"
 )
+
+const maxLogMessageLength = 4096
 
 // Entry represents a single audit log entry.
 type Entry struct {
 	Timestamp   time.Time            `json:"timestamp"`
 	AuditID     string               `json:"audit_id"`
 	Event       string               `json:"event"`
-	ToolName    string               `json:"tool_name,omitempty"`
 	Decision    types.Decision       `json:"decision"`
 	ThreatLevel types.ThreatLevel    `json:"threat_level,omitempty"`
 	ThreatType  types.ThreatCategory `json:"threat_type,omitempty"`
@@ -67,28 +72,52 @@ func (l *Logger) Log(entry *Entry) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	if entry.Timestamp.IsZero() {
-		entry.Timestamp = time.Now().UTC()
+	// Work on a copy to avoid mutating the caller's entry
+	sanitized := *entry
+
+	if sanitized.Timestamp.IsZero() {
+		sanitized.Timestamp = time.Now().UTC()
 	}
 
-	return l.encoder.Encode(entry)
+	// Sanitize user-controllable fields to prevent log injection (#22)
+	sanitized.Event = sanitizeLogField(sanitized.Event)
+	sanitized.Message = sanitizeLogField(sanitized.Message)
+	sanitized.SessionID = sanitizeLogField(sanitized.SessionID)
+
+	return l.encoder.Encode(&sanitized)
 }
 
-// LogFromOutput creates and writes an audit entry from a HookOutput.
-func (l *Logger) LogFromOutput(input *types.HookInput, output *types.HookOutput) error {
-	entry := &Entry{
-		Timestamp:   time.Now().UTC(),
-		AuditID:     output.AuditID,
-		Event:       input.Event,
-		ToolName:    input.ToolName,
-		Decision:    output.Decision,
-		ThreatLevel: output.ThreatLevel,
-		ThreatType:  output.ThreatType,
-		Message:     output.Message,
-		SessionID:   input.SessionID,
+// ansiEscapePattern matches ANSI escape sequences.
+var ansiEscapePattern = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+
+// sanitizeLogField strips ANSI escapes and control characters, replaces
+// newlines with spaces, and truncates to maxLogMessageLength to prevent
+// log injection.
+func sanitizeLogField(s string) string {
+	// Strip ANSI escape sequences first
+	s = ansiEscapePattern.ReplaceAllString(s, "")
+
+	s = strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\r' {
+			return ' '
+		}
+		if unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, s)
+
+	if len(s) > maxLogMessageLength {
+		// Walk back from the byte limit to find a valid rune boundary,
+		// avoiding truncation in the middle of a multi-byte UTF-8 sequence.
+		truncLen := maxLogMessageLength
+		for truncLen > 0 && !utf8.RuneStart(s[truncLen]) {
+			truncLen--
+		}
+		s = s[:truncLen]
 	}
 
-	return l.Log(entry)
+	return s
 }
 
 // Close closes the log file.

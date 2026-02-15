@@ -17,7 +17,12 @@ audit/
 ```
 
 **Key Types:**
-- `Logger` - Audit event logger with structured output
+- `Logger` - Audit event logger with structured JSON output
+- `Entry` - Audit log entry with timestamp, audit ID, event, decision, threat metadata, optional SessionID
+
+**Key Functions:**
+- `Log(*Entry)` - Write audit entry with automatic timestamp and field sanitization
+- `sanitizeLogField()` - Strips ANSI escapes, control chars, replaces newlines, UTF-8 safe truncation to 4096 chars
 
 <!-- END AUTO-MANAGED -->
 
@@ -28,6 +33,14 @@ audit/
 - Structured JSON output for machine parsing
 - Include audit ID (UUID) for event correlation
 - Timestamp all events in UTC
+
+**Security Hardening:**
+- All log fields sanitized to prevent log injection (Event, Message, SessionID)
+- ANSI escape sequences stripped via regex
+- Control characters replaced with spaces
+- Newlines replaced with spaces
+- Max field length: 4096 characters with UTF-8 safe truncation
+- Truncation uses utf8.RuneStart() walk-back to avoid splitting multi-byte sequences
 
 <!-- END AUTO-MANAGED -->
 

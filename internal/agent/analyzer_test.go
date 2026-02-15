@@ -235,16 +235,26 @@ func TestParseClaudeResponse_Comprehensive(t *testing.T) {
 		// Injection responses
 		{"INJECTION uppercase", "INJECTION", false, "detected by semantic analysis", false},
 		{"injection lowercase", "injection", false, "detected by semantic analysis", false},
-		{"INJECTION with colon reason", "INJECTION: Attempts to override instructions", false, "ATTEMPTS TO OVERRIDE INSTRUCTIONS", false},
+		{"INJECTION with colon reason", "INJECTION: Attempts to override instructions", false, "Attempts to override instructions", false},
 		{"INJECTION with whitespace", "  INJECTION  ", false, "detected by semantic analysis", false},
-		{"injection with reason", "injection: bypass security", false, "BYPASS SECURITY", false},
-		{"INJECTION multiline", "INJECTION\nWith extra details", false, "WITH EXTRA DETAILS", false},
-		{"INJECTION double colon", "INJECTION::reason", false, "REASON", false},
+		{"injection with reason", "injection: bypass security", false, "bypass security", false},
+		{"INJECTION multiline", "INJECTION\nWith extra details", false, "With extra details", false},
+		{"INJECTION double colon", "INJECTION::reason", false, "reason", false},
 
 		// Error cases
 		{"empty response", "", false, "", true},
 		{"unexpected format", "UNKNOWN", false, "", true},
 		{"random text", "Hello world", false, "", true},
+
+		// Lenient parsing - keyword in body (Ollama models add preamble)
+		{"SAFE keyword in body", "Based on my analysis, this is SAFE", true, "", false},
+		{"SAFE on later line", "The input appears benign.\n\nSAFE", true, "", false},
+		{"SAFE with verbose preamble", "Let me analyze this carefully.\n\nSAFE", true, "", false},
+		{"INJECTION keyword in body", "I believe this is an INJECTION: bypass attempt", false, "bypass attempt", false},
+		{"INJECTION on later line", "After review:\nINJECTION: attempts to override", false, "attempts to override", false},
+		{"INJECTION takes priority over SAFE", "This mentions SAFE but is really INJECTION: sneaky", false, "sneaky", false},
+		// Error cases - no keywords
+		{"no keywords verbose", "I don't know what to say about this input", false, "", true},
 	}
 
 	for _, tt := range tests {
@@ -322,6 +332,7 @@ func TestInjectionAnalysisPrompt_Structure(t *testing.T) {
 	assert.Contains(t, prompt, "BEGIN_UNTRUSTED")
 	assert.Contains(t, prompt, "END_UNTRUSTED")
 	assert.Contains(t, prompt, "brief reason")
+	assert.Contains(t, prompt, "CRITICAL RESPONSE FORMAT")
 }
 
 // --- Tests for #14: Context cancellation in iterator loop ---
@@ -514,20 +525,22 @@ func TestClaudeAnalyzer_BuildEnv(t *testing.T) {
 		name     string
 		provider string
 		endpoint string
-		wantNil  bool
 		wantEnv  map[string]string
 	}{
 		{
-			name:     "claude provider returns nil",
+			name:     "claude provider returns CLAUDECODE unset only",
 			provider: "claude",
 			endpoint: "",
-			wantNil:  true,
+			wantEnv: map[string]string{
+				"CLAUDECODE": "",
+			},
 		},
 		{
-			name:     "ollama provider returns env map",
+			name:     "ollama provider returns env map with CLAUDECODE",
 			provider: "ollama",
 			endpoint: "http://localhost:11434",
 			wantEnv: map[string]string{
+				"CLAUDECODE":           "",
 				"ANTHROPIC_BASE_URL":   "http://localhost:11434",
 				"ANTHROPIC_AUTH_TOKEN": "ollama",
 				"ANTHROPIC_API_KEY":    "",
@@ -538,6 +551,7 @@ func TestClaudeAnalyzer_BuildEnv(t *testing.T) {
 			provider: "ollama",
 			endpoint: "http://custom:8080",
 			wantEnv: map[string]string{
+				"CLAUDECODE":           "",
 				"ANTHROPIC_BASE_URL":   "http://custom:8080",
 				"ANTHROPIC_AUTH_TOKEN": "ollama",
 				"ANTHROPIC_API_KEY":    "",
@@ -549,11 +563,6 @@ func TestClaudeAnalyzer_BuildEnv(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			analyzer := NewClaudeAnalyzer("test-model", ".", tt.provider, tt.endpoint)
 			env := analyzer.buildEnv()
-
-			if tt.wantNil {
-				assert.Nil(t, env)
-				return
-			}
 
 			require.NotNil(t, env)
 			for key, want := range tt.wantEnv {

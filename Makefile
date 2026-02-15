@@ -27,19 +27,19 @@ build-all:
 	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o $(BIN_DIR)/$(BINARY_NAME)-darwin-arm64 ./$(CMD_DIR)
 	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o $(BIN_DIR)/$(BINARY_NAME)-windows-amd64.exe ./$(CMD_DIR)
 
-# Run all tests
+# Run unit tests (excludes integration)
 test:
-	go test -v ./...
+	go test -v $(shell go list ./... | grep -v /tests/integration)
 
-# Run tests with coverage
+# Run unit tests with coverage (excludes integration)
 test-coverage:
-	go test -v -coverprofile=coverage.out ./...
+	go test -v -coverprofile=coverage.out $(shell go list ./... | grep -v /tests/integration)
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
 
-# Run benchmarks
+# Run benchmarks (excludes integration)
 bench:
-	go test -bench=. -benchmem ./...
+	go test -bench=. -benchmem $(shell go list ./... | grep -v /tests/integration)
 
 # Run integration tests (pattern-only, no external deps)
 test-integration:
@@ -51,7 +51,7 @@ test-integration-all:
 	@echo "Running all integration tests..."
 	@echo "Note: LLM tests require Ollama running (ollama serve)"
 	@echo "Note: Agent tests require Claude CLI installed"
-	go test -v -timeout 5m ./tests/integration/...
+	go test -v -timeout 30m ./tests/integration/...
 
 # Run linter
 lint:

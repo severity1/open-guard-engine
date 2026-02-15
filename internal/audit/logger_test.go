@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -21,7 +22,7 @@ func TestNewLogger(t *testing.T) {
 
 	logger, err := NewLogger(logDir)
 	require.NoError(t, err)
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	assert.NotNil(t, logger)
 	assert.DirExists(t, logDir)
@@ -34,13 +35,12 @@ func TestLogger_Log(t *testing.T) {
 
 	logger, err := NewLogger(logDir)
 	require.NoError(t, err)
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	entry := &Entry{
 		Timestamp:   time.Now().UTC(),
 		AuditID:     "test-audit-123",
-		Event:       "pre-tool",
-		ToolName:    "Bash",
+		Event:       "analyze",
 		Decision:    types.DecisionBlock,
 		ThreatLevel: types.ThreatLevelHigh,
 		ThreatType:  types.ThreatCategoryNetwork,
@@ -52,66 +52,22 @@ func TestLogger_Log(t *testing.T) {
 	require.NoError(t, err)
 
 	// Close to flush
-	logger.Close()
+	_ = logger.Close()
 
 	// Read and verify log file
 	logPath := filepath.Join(logDir, "audit.log")
 	file, err := os.Open(logPath)
 	require.NoError(t, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var readEntry Entry
 	err = json.NewDecoder(file).Decode(&readEntry)
 	require.NoError(t, err)
 
 	assert.Equal(t, "test-audit-123", readEntry.AuditID)
-	assert.Equal(t, "pre-tool", readEntry.Event)
-	assert.Equal(t, "Bash", readEntry.ToolName)
+	assert.Equal(t, "analyze", readEntry.Event)
 	assert.Equal(t, types.DecisionBlock, readEntry.Decision)
 	assert.Equal(t, types.ThreatLevelHigh, readEntry.ThreatLevel)
-}
-
-func TestLogger_LogFromOutput(t *testing.T) {
-	tmpDir := t.TempDir()
-	logDir := filepath.Join(tmpDir, "logs")
-
-	logger, err := NewLogger(logDir)
-	require.NoError(t, err)
-	defer logger.Close()
-
-	input := &types.HookInput{
-		Event:     "pre-tool",
-		ToolName:  "Bash",
-		SessionID: "session-789",
-	}
-
-	output := &types.HookOutput{
-		Decision:    types.DecisionConfirm,
-		ThreatLevel: types.ThreatLevelMedium,
-		ThreatType:  types.ThreatCategoryCredentials,
-		Message:     "Credential access detected",
-		AuditID:     "audit-xyz",
-	}
-
-	err = logger.LogFromOutput(input, output)
-	require.NoError(t, err)
-
-	// Close to flush
-	logger.Close()
-
-	// Read and verify
-	logPath := filepath.Join(logDir, "audit.log")
-	file, err := os.Open(logPath)
-	require.NoError(t, err)
-	defer file.Close()
-
-	var readEntry Entry
-	err = json.NewDecoder(file).Decode(&readEntry)
-	require.NoError(t, err)
-
-	assert.Equal(t, "audit-xyz", readEntry.AuditID)
-	assert.Equal(t, "session-789", readEntry.SessionID)
-	assert.Equal(t, types.DecisionConfirm, readEntry.Decision)
 }
 
 func TestLogger_MultipleEntries(t *testing.T) {
@@ -120,7 +76,7 @@ func TestLogger_MultipleEntries(t *testing.T) {
 
 	logger, err := NewLogger(logDir)
 	require.NoError(t, err)
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	// Write multiple entries
 	for i := 0; i < 5; i++ {
@@ -134,13 +90,13 @@ func TestLogger_MultipleEntries(t *testing.T) {
 	}
 
 	// Close to flush
-	logger.Close()
+	_ = logger.Close()
 
 	// Read and count entries
 	logPath := filepath.Join(logDir, "audit.log")
 	file, err := os.Open(logPath)
 	require.NoError(t, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	scanner := bufio.NewScanner(file)
 	count := 0
@@ -157,7 +113,7 @@ func TestLogger_LogPath(t *testing.T) {
 
 	logger, err := NewLogger(logDir)
 	require.NoError(t, err)
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	expected := filepath.Join(logDir, "audit.log")
 	assert.Equal(t, expected, logger.LogPath())
@@ -169,7 +125,7 @@ func TestLogger_Log_SetsTimestamp(t *testing.T) {
 
 	logger, err := NewLogger(logDir)
 	require.NoError(t, err)
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	// Create entry with zero timestamp
 	entry := &Entry{
@@ -184,13 +140,13 @@ func TestLogger_Log_SetsTimestamp(t *testing.T) {
 	after := time.Now().UTC()
 
 	// Close to flush
-	logger.Close()
+	_ = logger.Close()
 
 	// Read and verify timestamp was set
 	logPath := filepath.Join(logDir, "audit.log")
 	file, err := os.Open(logPath)
 	require.NoError(t, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var readEntry Entry
 	err = json.NewDecoder(file).Decode(&readEntry)
@@ -208,7 +164,7 @@ func TestLogger_Log_PreservesTimestamp(t *testing.T) {
 
 	logger, err := NewLogger(logDir)
 	require.NoError(t, err)
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	// Create entry with explicit timestamp
 	fixedTime := time.Date(2024, 6, 15, 10, 30, 0, 0, time.UTC)
@@ -223,13 +179,13 @@ func TestLogger_Log_PreservesTimestamp(t *testing.T) {
 	require.NoError(t, err)
 
 	// Close to flush
-	logger.Close()
+	_ = logger.Close()
 
 	// Read and verify timestamp was preserved
 	logPath := filepath.Join(logDir, "audit.log")
 	file, err := os.Open(logPath)
 	require.NoError(t, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var readEntry Entry
 	err = json.NewDecoder(file).Decode(&readEntry)
@@ -256,7 +212,7 @@ func TestLogger_ConcurrentWrites(t *testing.T) {
 
 	logger, err := NewLogger(logDir)
 	require.NoError(t, err)
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	// Write concurrently from multiple goroutines
 	numGoroutines := 10
@@ -283,13 +239,13 @@ func TestLogger_ConcurrentWrites(t *testing.T) {
 	wg.Wait()
 
 	// Close to flush
-	logger.Close()
+	_ = logger.Close()
 
 	// Count entries
 	logPath := filepath.Join(logDir, "audit.log")
 	file, err := os.Open(logPath)
 	require.NoError(t, err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	scanner := bufio.NewScanner(file)
 	count := 0
@@ -339,7 +295,7 @@ func TestNewLogger_DefaultDirectory(t *testing.T) {
 	if err != nil {
 		t.Skip("Cannot create logger in home directory")
 	}
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	expectedPath := filepath.Join(homeDir, ".open-guard", "logs", "audit.log")
 	assert.Equal(t, expectedPath, logger.LogPath())
@@ -349,8 +305,7 @@ func TestEntry_AllFields(t *testing.T) {
 	entry := Entry{
 		Timestamp:   time.Now().UTC(),
 		AuditID:     "audit-123",
-		Event:       "pre-tool",
-		ToolName:    "Bash",
+		Event:       "analyze",
 		Decision:    types.DecisionBlock,
 		ThreatLevel: types.ThreatLevelHigh,
 		ThreatType:  types.ThreatCategoryNetwork,
@@ -368,10 +323,122 @@ func TestEntry_AllFields(t *testing.T) {
 
 	assert.Equal(t, entry.AuditID, decoded.AuditID)
 	assert.Equal(t, entry.Event, decoded.Event)
-	assert.Equal(t, entry.ToolName, decoded.ToolName)
 	assert.Equal(t, entry.Decision, decoded.Decision)
 	assert.Equal(t, entry.ThreatLevel, decoded.ThreatLevel)
 	assert.Equal(t, entry.ThreatType, decoded.ThreatType)
 	assert.Equal(t, entry.Message, decoded.Message)
 	assert.Equal(t, entry.SessionID, decoded.SessionID)
+}
+
+func TestLogger_Log_SanitizesFields(t *testing.T) {
+	tmpDir := t.TempDir()
+	logDir := filepath.Join(tmpDir, "logs")
+
+	logger, err := NewLogger(logDir)
+	require.NoError(t, err)
+	defer func() { _ = logger.Close() }()
+
+	entry := &Entry{
+		Timestamp: time.Now().UTC(),
+		AuditID:   "test-audit-sanitize",
+		Event:     "analyze\x1b[31m\x00injected",
+		Decision:  types.DecisionBlock,
+		Message:   "threat\ndetected\r\x1b[0mnewline",
+		SessionID: "session\x00id\nnewline\x1b[32m",
+	}
+
+	err = logger.Log(entry)
+	require.NoError(t, err)
+
+	// Close to flush
+	_ = logger.Close()
+
+	// Read and verify sanitized fields
+	logPath := filepath.Join(logDir, "audit.log")
+	file, err := os.Open(logPath)
+	require.NoError(t, err)
+	defer func() { _ = file.Close() }()
+
+	var readEntry Entry
+	err = json.NewDecoder(file).Decode(&readEntry)
+	require.NoError(t, err)
+
+	// ANSI escapes, control chars, and newlines should be stripped/replaced
+	assert.NotContains(t, readEntry.Event, "\x1b[")
+	assert.NotContains(t, readEntry.Event, "\x00")
+	assert.NotContains(t, readEntry.Message, "\n")
+	assert.NotContains(t, readEntry.Message, "\r")
+	assert.NotContains(t, readEntry.Message, "\x1b[")
+	assert.NotContains(t, readEntry.SessionID, "\x00")
+	assert.NotContains(t, readEntry.SessionID, "\n")
+	assert.NotContains(t, readEntry.SessionID, "\x1b[")
+
+	// Verify content is preserved after sanitization
+	// ANSI escapes are stripped (removed), control chars and newlines become spaces
+	assert.Equal(t, "analyze injected", readEntry.Event)
+	assert.Equal(t, "threat detected newline", readEntry.Message)
+	assert.Equal(t, "session id newline", readEntry.SessionID)
+}
+
+func TestSanitizeLogField_UTF8TruncationSafety(t *testing.T) {
+	// 4095 bytes of ASCII + a 3-byte UTF-8 char = 4098 bytes total.
+	// Byte-level truncation at 4096 would split the multi-byte rune.
+	input := strings.Repeat("a", 4095) + "\xe2\x9c\x93" // U+2713 check mark (3 bytes)
+	result := sanitizeLogField(input)
+
+	assert.True(t, len(result) <= maxLogMessageLength, "result should not exceed max length")
+	// Verify result is valid UTF-8 (no partial runes)
+	for i, r := range result {
+		assert.NotEqual(t, rune(0xFFFD), r, "invalid rune at position %d - truncation split a multi-byte character", i)
+	}
+}
+
+func TestSanitizeLogField(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "control chars stripped",
+			input:    "threat\x00detected\x1b[31m",
+			expected: "threat detected",
+		},
+		{
+			name:     "newlines replaced with space",
+			input:    "line1\nline2\rline3",
+			expected: "line1 line2 line3",
+		},
+		{
+			name:     "long message truncated",
+			input:    strings.Repeat("a", 5000),
+			expected: strings.Repeat("a", 4096),
+		},
+		{
+			name:     "clean message unchanged",
+			input:    "Normal threat message",
+			expected: "Normal threat message",
+		},
+		{
+			name:     "null byte injection stripped",
+			input:    "field\x00injected",
+			expected: "field injected",
+		},
+		{
+			name:     "newline injection replaced",
+			input:    "field\ninjected",
+			expected: "field injected",
+		},
+		{
+			name:     "mixed injection stripped",
+			input:    "session\x00injected\nfake",
+			expected: "session injected fake",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, sanitizeLogField(tc.input))
+		})
+	}
 }

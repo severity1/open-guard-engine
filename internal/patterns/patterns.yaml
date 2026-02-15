@@ -28,6 +28,34 @@ patterns:
     severity: high
     pattern: '\bnmap\s+'
 
+  - id: T1-004
+    category: T1
+    name: cloud_metadata_ssrf
+    description: AWS cloud metadata endpoint access (SSRF)
+    severity: critical
+    pattern: '169\.254\.169\.254'
+
+  - id: T1-005
+    category: T1
+    name: gcp_metadata_ssrf
+    description: GCP cloud metadata endpoint access (SSRF)
+    severity: critical
+    pattern: '(?i)metadata\.google\.internal'
+
+  - id: T1-006
+    category: T1
+    name: ecs_metadata_ssrf
+    description: AWS ECS credentials endpoint access (SSRF)
+    severity: critical
+    pattern: '169\.254\.170\.2'
+
+  - id: T1-007
+    category: T1
+    name: azure_metadata_ssrf
+    description: Azure IMDS metadata endpoint access (SSRF)
+    severity: critical
+    pattern: '(?i)metadata\.azure\.com'
+
   # T2: Credential access
   - id: T2-001
     category: T2
@@ -120,7 +148,7 @@ patterns:
     name: etc_write
     description: Writing to /etc directory
     severity: critical
-    pattern: '^/etc/'
+    pattern: '/etc/'
 
   - id: T4-002
     category: T4
@@ -163,7 +191,7 @@ patterns:
     name: system_override
     description: Attempt to override system prompt
     severity: critical
-    pattern: '(?i)^system:\s+'
+    pattern: '(?im)^system:\s+'
 
   - id: T5-004
     category: T5

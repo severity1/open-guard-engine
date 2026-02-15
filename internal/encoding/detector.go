@@ -7,6 +7,9 @@ import (
 	"regexp"
 	"strings"
 	"unicode"
+	"unicode/utf8"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 // DetectionResult contains the results of encoding detection.
@@ -16,6 +19,9 @@ type DetectionResult struct {
 	EncodingTypes  []string
 	Suspicious     bool
 }
+
+// maxDecodeDepth limits recursive decoding to prevent infinite loops.
+const maxDecodeDepth = 3
 
 // Detector detects and decodes obfuscated content (base64, hex, ROT13, Unicode tricks).
 type Detector struct {
@@ -28,8 +34,8 @@ type Detector struct {
 // NewDetector creates a new encoding detector.
 func NewDetector() *Detector {
 	return &Detector{
-		// Match base64 strings (at least 20 chars, valid base64 alphabet)
-		base64Pattern: regexp.MustCompile(`[A-Za-z0-9+/]{20,}={0,2}`),
+		// Match base64 strings (at least 6 base64 chars + optional padding, minimum 8 total)
+		base64Pattern: regexp.MustCompile(`[A-Za-z0-9+/]{6,}={0,2}`),
 		// Match hex strings (0x prefix or \x sequences)
 		hexPattern: regexp.MustCompile(`(?i)(?:0x|\\x)?([0-9a-f]{2}){10,}`),
 		// Keywords that indicate injection in decoded content
@@ -112,25 +118,38 @@ func (d *Detector) Detect(content string) *DetectionResult {
 	return result
 }
 
-// decodeBase64Suspicious attempts to decode base64 content and checks for suspicious keywords.
+// decodeBase64Suspicious attempts to decode base64 content recursively up to maxDecodeDepth.
 func (d *Detector) decodeBase64Suspicious(content string) (string, bool) {
+	return d.decodeBase64Recursive(content, 0)
+}
+
+// decodeBase64Recursive decodes base64 content up to maxDecodeDepth layers.
+func (d *Detector) decodeBase64Recursive(content string, depth int) (string, bool) {
+	if depth >= maxDecodeDepth {
+		return "", false
+	}
+
 	matches := d.base64Pattern.FindAllString(content, -1)
 	var decodedParts []string
 
 	for _, match := range matches {
-		// Try to decode
 		decoded, err := base64.StdEncoding.DecodeString(match)
 		if err != nil {
-			// Try URL-safe base64
 			decoded, err = base64.URLEncoding.DecodeString(match)
 			if err != nil {
 				continue
 			}
 		}
 
-		// Check if decoded content is printable text
 		decodedStr := string(decoded)
-		if isPrintableASCII(decodedStr) {
+		if !isPrintableASCII(decodedStr) {
+			continue
+		}
+
+		// Recursively decode if the decoded content itself contains base64
+		if innerDecoded, found := d.decodeBase64Recursive(decodedStr, depth+1); found {
+			decodedParts = append(decodedParts, innerDecoded)
+		} else {
 			decodedParts = append(decodedParts, decodedStr)
 		}
 	}
@@ -175,15 +194,15 @@ func (d *Detector) decodeHexSuspicious(content string) (string, bool) {
 
 // decodeROT13 applies ROT13 transformation to alphabetic characters.
 func (d *Detector) decodeROT13(content string) string {
-	result := make([]rune, len(content))
-	for i, r := range content {
+	result := make([]rune, 0, utf8.RuneCountInString(content))
+	for _, r := range content {
 		switch {
 		case r >= 'a' && r <= 'z':
-			result[i] = 'a' + (r-'a'+13)%26
+			result = append(result, 'a'+(r-'a'+13)%26)
 		case r >= 'A' && r <= 'Z':
-			result[i] = 'A' + (r-'A'+13)%26
+			result = append(result, 'A'+(r-'A'+13)%26)
 		default:
-			result[i] = r
+			result = append(result, r)
 		}
 	}
 	return string(result)
@@ -232,11 +251,14 @@ func (d *Detector) removeZeroWidthChars(content string) string {
 	return result.String()
 }
 
-// hasHomoglyphs checks for Cyrillic or other lookalike characters.
+// hasHomoglyphs checks for Cyrillic, Greek, or fullwidth lookalike characters.
 func (d *Detector) hasHomoglyphs(content string) bool {
 	for _, r := range content {
+		// Check fullwidth Latin characters (U+FF01 to U+FF5E)
+		if r >= '\uFF01' && r <= '\uFF5E' {
+			return true
+		}
 		if unicode.Is(unicode.Cyrillic, r) || unicode.Is(unicode.Greek, r) {
-			// Check if it looks like a Latin letter
 			if isHomoglyph(r) {
 				return true
 			}
@@ -246,7 +268,11 @@ func (d *Detector) hasHomoglyphs(content string) bool {
 }
 
 // normalizeHomoglyphs replaces lookalike characters with their Latin equivalents.
+// Applies NFKC normalization first (handles fullwidth chars), then manual Cyrillic/Greek mappings.
 func (d *Detector) normalizeHomoglyphs(content string) string {
+	// NFKC normalization converts fullwidth and other compatibility forms to their canonical equivalents
+	content = norm.NFKC.String(content)
+
 	// Common Cyrillic to Latin mappings
 	homoglyphMap := map[rune]rune{
 		'а': 'a', 'А': 'A', // Cyrillic a
@@ -303,6 +329,8 @@ func isHomoglyph(r rune) bool {
 }
 
 // isPrintableASCII checks if a string contains mostly printable ASCII.
+// Uses a stricter 90% threshold for short strings (under 15 bytes) to reduce
+// false positives from the lowered base64 minimum length.
 func isPrintableASCII(s string) bool {
 	printable := 0
 	for _, r := range s {
@@ -310,6 +338,12 @@ func isPrintableASCII(s string) bool {
 			printable++
 		}
 	}
-	// At least 80% should be printable ASCII
-	return len(s) > 0 && float64(printable)/float64(len(s)) >= 0.8
+	if len(s) == 0 {
+		return false
+	}
+	threshold := 0.8
+	if len(s) < 15 {
+		threshold = 0.9
+	}
+	return float64(printable)/float64(len(s)) >= threshold
 }

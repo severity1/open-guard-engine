@@ -6,10 +6,10 @@
 Defense-in-depth security engine for AI coding assistants. Protects codebases from prompt injection, malicious commands, and harmful content through layered detection: fast pattern matching, agent-based analysis, and LLM content safety.
 
 **Key Features:**
-- 93 threat patterns (T1-T9) with regex matching
+- 97 threat patterns (T1-T9) with regex matching
 - Claude SDK integration for semantic injection detection (T5)
 - Ollama llama-guard3 for content safety (S1-S13)
-- Encoding detection (base64, hex, ROT13, Unicode homoglyphs)
+- Encoding detection (base64, hex, ROT13, Unicode homoglyphs, fullwidth/NFKC, recursive decoding)
 - Three decision modes: strict, confirm, permissive
 
 <!-- END AUTO-MANAGED -->
@@ -24,11 +24,11 @@ make build-all          # Build for all platforms (linux, darwin, windows)
 make install            # Install to GOPATH/bin
 
 # Test
-make test               # Run all unit tests
-make test-coverage      # Run tests with coverage report
+make test               # Run unit tests (excludes integration)
+make test-coverage      # Run unit tests with coverage report
 make test-integration   # Run pattern-only integration tests (no external deps)
 make test-integration-all  # Run all integration tests (requires Ollama + Claude)
-make bench              # Run benchmarks
+make bench              # Run benchmarks (excludes integration)
 
 # Quality
 make lint               # Run golangci-lint
@@ -70,7 +70,7 @@ open-guard-engine/
 **Detection Pipeline (layered, short-circuit on match):**
 ```
 stdin -> Layer 0: Encoding Detection (decode obfuscated content)
-      -> Layer 1: Pattern Matching (fast, deterministic, 93 patterns)
+      -> Layer 1: Pattern Matching (fast, deterministic, 97 patterns)
       -> Layer 2: Agent Analysis (Claude SDK semantic detection)
       -> Layer 3: LLM Safety (llama-guard3 content classification)
       -> stdout: JSON decision
@@ -81,10 +81,11 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 2. Config loaded via --config flag or auto-discovery (project > global > defaults)
 3. Input size validated against config's MaxInputSize (may be stricter than hardcoded limit)
 4. Encoding detector decodes obfuscated content (base64, hex, etc.)
-5. Pattern matcher checks against 93 compiled regex patterns
+5. Pattern matcher checks against 97 compiled regex patterns
 6. If no match and agent enabled, Claude analyzes with timeout and context cancellation
-7. If safe and LLM enabled, llama-guard3 classifies content safety
-8. Response handler builds JSON output based on mode (strict/confirm/permissive)
+7. If agent/LLM errors occur, handleAnalysisError applies mode-aware handling (permissive: continue, others: confirm)
+8. If safe and LLM enabled, llama-guard3 classifies content safety
+9. Response handler builds JSON output based on mode (strict/confirm/permissive)
 
 **Resource Limits:**
 - Hardcoded 10MB stdin limit applied before config load
@@ -117,7 +118,7 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 **Error Handling:**
 - Wrap errors with context: `fmt.Errorf("operation: %w", err)`
 - Early return on error, avoid deep nesting
-- Check error from deferred Close() only when it matters
+- Silence expected Close() errors in deferred calls: `defer func() { _ = resp.Body.Close() }()`
 - Distinguish context cancellation: check `ctx.Err()` separately from operation errors
 
 **Context & Timeout Handling:**
@@ -152,6 +153,13 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 - Permissive: `block`/`confirm` -> `log`
 - Audit IDs generated via UUID
 
+**Error Handling (handleAnalysisError):**
+- Agent/LLM analysis errors handled based on mode
+- Permissive mode: errors ignored, pipeline continues (fail-open)
+- Other modes: errors produce `confirm` decision with medium severity (fail-closed)
+- Generic error messages prevent information leakage (no hostnames, connection strings)
+- Detailed errors logged to stderr for operator diagnostics (all modes)
+
 **Pattern File Structure:**
 - YAML-based pattern definitions in `internal/patterns/patterns.yaml`
 - Compiled at startup via `//go:embed`
@@ -163,9 +171,20 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 ## Git Insights
 
 **Recent Design Decisions:**
+- Pattern anchor fixes: removed ^ from T4-001 to match /etc/ mid-command, added (?m) multiline flag to T5-003 for start-of-line system: matching (46c9a63)
+- ThreatCategoryUnavailable added to distinguish service errors from unrecognized threat categories, LLM errors now use Unavailable instead of Unknown (46c9a63)
+- extractInjectionResult() preserves original casing in reasons, uses TrimLeft for colon stripping to handle double colons (46c9a63)
+- LLM response body size limit: maxResponseBodySize constant (1MB) enforced with io.LimitReader on all decode paths (success, error, IsAvailable) (46c9a63)
+- Compile-time interface check added to llm.MockAnalyzer for consistency with other mock implementations (46c9a63)
+- Lenient agent response parsing to handle Ollama models that add preamble text before keywords (640dbc0)
+- parseClaudeResponse() searches for keywords anywhere in response as fallback, prioritizes INJECTION before SAFE for fail-closed behavior (640dbc0)
+- extractInjectionResult() helper extracts reason from INJECTION responses (640dbc0)
+- Test target separation: unit tests (make test) exclude integration tests for faster local dev, integration tests require explicit targets (df0501b)
+- Integration test timeout increased from 5m to 30m to accommodate slower LLM/agent tests (df0501b)
 - Extracted collectResponse() for testability and improved context cancellation handling (PR #4)
 - Race condition fix: replaced setupOllamaEnv (parent env mutation) with buildEnv (subprocess env map) to eliminate shared state mutation (PR #8)
 - buildEnv() returns new map each call to ensure concurrent access safety and isolation
+- buildEnv() always unsets CLAUDECODE env var to enable nested SDK invocation from Claude Code hooks/plugins (#102)
 - Strict validation for ThreatCategory and Config values to fail fast on invalid YAML/config (PR #15)
 - Exported Analyzer interface for external testing and mocking (PR #12)
 - Tool-agnostic pattern matching (not tied to specific tool names)
@@ -174,6 +193,21 @@ stdin -> Layer 0: Encoding Detection (decode obfuscated content)
 - Explicit config path support via --config flag for multi-environment setups
 - Critical path hardening against DoS attacks (input size limits, timeouts, context cancellation)
 - Two-stage input validation: hardcoded limit before config, then config limit
+- Recursive base64 decoding with max depth (3 layers) to catch nested encoding without unbounded recursion (#19)
+- Fullwidth/NFKC Unicode normalization to detect obfuscated injection keywords (#19)
+- Short base64 payload detection for single-keyword injection attempts (#19)
+- Removed hardcoded LLM HTTP timeout - relies on context cancellation for timeout control (#25)
+- Unknown LLM responses default to unsafe (fail-closed) to prevent bypass via malformed output (#19)
+- Deferred Close() errors explicitly silenced where cleanup failure is non-critical (#6)
+- Audit log sanitization to prevent log injection via ANSI escapes, control chars, and newlines (#22, #6)
+- SSRF patterns added: AWS metadata (169.254.169.254), GCP metadata (metadata.google.internal), ECS credentials (169.254.170.2), Azure IMDS (metadata.azure.com) (#19)
+- Mode-aware error handling: agent/LLM errors fail-open in permissive mode, fail-closed otherwise (#19)
+- Endpoint validation enforces http/https schemes for LLM and agent endpoints to prevent file:// and other protocol exploits (#19)
+- Error message sanitization: generic "service error" prevents leakage of internal details (hostnames, connection strings), detailed errors logged to stderr (#32)
+- SessionID sanitization added to audit logger to prevent log injection via session identifiers (#32)
+- UTF-8 safe truncation in audit logs uses utf8.RuneStart() to avoid splitting multi-byte sequences (#32)
+- GCP metadata pattern (T1-005) case-insensitive to catch obfuscation variants like Metadata.Google.Internal (#32)
+- Removed hook-specific types (HookInput, Context, GetCommand/GetFilePath helpers) and LogFromOutput method from audit logger to simplify API surface (a78daa8)
 
 **Commit Style:**
 - Conventional format: `type: description (#issue)`

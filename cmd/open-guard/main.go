@@ -243,7 +243,11 @@ Output is JSON with decision (allow/block/confirm) and threat details.`,
 					defer agentCancel()
 
 					result, err := claudeAnalyzer.Analyze(agentCtx, analysisContent)
-					if err == nil && !result.Safe {
+					if err != nil {
+						if output := handleAnalysisError(cfg, respHandler, types.DetectionSourceAgent, types.ThreatCategoryPromptInjection, err); output != nil {
+							return outputJSON(cmd, output)
+						}
+					} else if !result.Safe {
 						reason := result.Reason
 						if reason == "" {
 							reason = "detected by semantic analysis"
@@ -275,7 +279,11 @@ Output is JSON with decision (allow/block/confirm) and threat details.`,
 					defer llmCancel()
 
 					result, err := contentAnalyzer.Analyze(llmCtx, analysisContent)
-					if err == nil && !result.Safe {
+					if err != nil {
+						if output := handleAnalysisError(cfg, respHandler, types.DetectionSourceLLM, types.ThreatCategoryUnavailable, err); output != nil {
+							return outputJSON(cmd, output)
+						}
+					} else if !result.Safe {
 						category := mapCategory(result.Categories)
 						output := respHandler.BuildWithModeOverrideAndSource(
 							types.DecisionConfirm,
@@ -319,14 +327,33 @@ func severityOrder(s types.ThreatLevel) int {
 	return order[s]
 }
 
+// handleAnalysisError handles errors from agent/LLM analysis layers.
+// In permissive mode, errors are ignored and the pipeline continues (returns nil).
+// In other modes, errors produce a confirm decision (mode override transforms: strict -> block).
+// The generic message avoids leaking internal details (hostnames, connection strings).
+func handleAnalysisError(cfg *config.Config, respHandler *response.Handler, source types.DetectionSource, category types.ThreatCategory, analysisErr error) *types.HookOutput {
+	// Log detailed error to stderr for operator diagnostics (all modes)
+	fmt.Fprintf(os.Stderr, "open-guard: %s analysis error: %s\n", source, analysisErr)
+	if cfg.Mode == config.ModePermissive {
+		return nil
+	}
+	return respHandler.BuildWithModeOverrideAndSource(
+		types.DecisionConfirm,
+		types.ThreatLevelMedium,
+		category,
+		source,
+		"Analysis unavailable: service error",
+	)
+}
+
 func mapCategory(categories []string) types.ThreatCategory {
 	if len(categories) == 0 {
-		return types.SafetyCategoryViolentCrimes // S1 default for unknown LLM output
+		return types.ThreatCategoryUnknown // Default for unknown LLM output
 	}
 	cat := categories[0]
 	parsed, err := types.ParseThreatCategory(cat)
 	if err != nil {
-		return types.SafetyCategoryViolentCrimes // S1 fallback for unrecognized categories
+		return types.ThreatCategoryUnknown // Fallback for unrecognized categories
 	}
 	return parsed
 }

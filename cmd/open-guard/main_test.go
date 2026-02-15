@@ -2,11 +2,14 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/severity1/open-guard-engine/internal/config"
+	"github.com/severity1/open-guard-engine/internal/response"
 	"github.com/severity1/open-guard-engine/internal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -278,12 +281,12 @@ func TestMapCategory(t *testing.T) {
 		categories []string
 		expected   types.ThreatCategory
 	}{
-		{"empty categories", []string{}, types.SafetyCategoryViolentCrimes},
+		{"empty categories", []string{}, types.ThreatCategoryUnknown},
 		{"single S category", []string{"S1"}, types.SafetyCategoryViolentCrimes},
 		{"lowercase s", []string{"s5"}, types.SafetyCategoryDefamation},
 		{"multiple categories", []string{"S1", "S5", "S10"}, types.SafetyCategoryViolentCrimes},
 		{"non-S category", []string{"T5"}, types.ThreatCategoryPromptInjection},
-		{"unknown category", []string{"X99"}, types.SafetyCategoryViolentCrimes},
+		{"unknown category", []string{"X99"}, types.ThreatCategoryUnknown},
 	}
 
 	for _, tc := range tests {
@@ -565,6 +568,88 @@ func TestAnalyzeCommand_SpecialCharacters(t *testing.T) {
 			output := buf.String()
 			// Should produce valid JSON output
 			assert.Contains(t, output, `"decision"`)
+		})
+	}
+}
+
+func TestHandleAnalysisError(t *testing.T) {
+	testErr := fmt.Errorf("connection refused to internal-host.corp:8443")
+
+	tests := []struct {
+		name           string
+		mode           config.Mode
+		source         types.DetectionSource
+		category       types.ThreatCategory
+		wantNil        bool
+		wantDecision   types.Decision
+		wantThreat     types.ThreatLevel
+		wantDetectedBy types.DetectionSource
+	}{
+		{
+			name:           "strict mode blocks on error",
+			mode:           config.ModeStrict,
+			source:         types.DetectionSourceAgent,
+			category:       types.ThreatCategoryPromptInjection,
+			wantNil:        false,
+			wantDecision:   types.DecisionBlock,
+			wantThreat:     types.ThreatLevelMedium,
+			wantDetectedBy: types.DetectionSourceAgent,
+		},
+		{
+			name:           "confirm mode confirms on error",
+			mode:           config.ModeConfirm,
+			source:         types.DetectionSourceAgent,
+			category:       types.ThreatCategoryPromptInjection,
+			wantNil:        false,
+			wantDecision:   types.DecisionConfirm,
+			wantThreat:     types.ThreatLevelMedium,
+			wantDetectedBy: types.DetectionSourceAgent,
+		},
+		{
+			name:    "permissive mode continues pipeline",
+			mode:    config.ModePermissive,
+			source:  types.DetectionSourceAgent,
+			category: types.ThreatCategoryPromptInjection,
+			wantNil: true,
+		},
+		{
+			name:           "LLM source with unavailable category",
+			mode:           config.ModeConfirm,
+			source:         types.DetectionSourceLLM,
+			category:       types.ThreatCategoryUnavailable,
+			wantNil:        false,
+			wantDecision:   types.DecisionConfirm,
+			wantThreat:     types.ThreatLevelMedium,
+			wantDetectedBy: types.DetectionSourceLLM,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := config.DefaultConfig()
+			cfg.Mode = tc.mode
+			respHandler := response.NewHandler(cfg)
+
+			output := handleAnalysisError(
+				cfg,
+				respHandler,
+				tc.source,
+				tc.category,
+				testErr,
+			)
+
+			if tc.wantNil {
+				assert.Nil(t, output, "permissive mode should return nil to continue pipeline")
+			} else {
+				require.NotNil(t, output)
+				assert.Equal(t, tc.wantDecision, output.Decision)
+				assert.Equal(t, tc.wantThreat, output.ThreatLevel)
+				assert.Equal(t, tc.wantDetectedBy, output.DetectedBy)
+				// Error message must not leak internal details
+				assert.NotContains(t, output.Message, "connection refused")
+				assert.NotContains(t, output.Message, "internal-host.corp")
+				assert.Contains(t, output.Message, "Analysis unavailable")
+			}
 		})
 	}
 }

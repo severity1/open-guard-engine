@@ -3,7 +3,7 @@
 <!-- AUTO-MANAGED: module-description -->
 ## Purpose
 
-Shared type definitions for the open-guard security engine. Defines the core domain types: decisions, threat levels, categories, detection sources, and hook I/O structures.
+Shared type definitions for the open-guard security engine. Defines the core domain types: decisions, threat levels, categories, detection sources, and JSON response structure.
 
 <!-- END AUTO-MANAGED -->
 
@@ -32,11 +32,13 @@ types/
 **ThreatCategory** - Type of threat:
 - `T1`-`T9`: Technical security (pattern-detected)
 - `S1`-`S13`: Content safety (LLM-detected)
+- `unknown`: Unclassified threat (analysis ran, category unrecognized)
+- `unavailable`: Analysis unavailable (service error)
 
 **DetectionSource** - Which layer detected:
 - `pattern`, `llm`, `agent`
 
-**HookInput/HookOutput** - JSON structures for Claude Code hooks
+**HookOutput** - JSON response structure with decision, threat details, and audit ID
 
 <!-- END AUTO-MANAGED -->
 
@@ -57,10 +59,6 @@ types/
 - `Description()` - Human-readable description
 - `IsSafetyCategory()` - Check if S1-S13
 - `IsThreatCategory()` - Check if T1-T9
-
-**Hook Input Helpers:**
-- `GetCommand()` - Extract command from Bash tool input
-- `GetFilePath()` - Extract path from Read/Write tool input
 
 <!-- END AUTO-MANAGED -->
 

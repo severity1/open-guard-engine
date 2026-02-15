@@ -16,7 +16,8 @@ Validate the development environment before starting.
 ```bash
 git status                    # Check for uncommitted changes
 make build                    # Verify build succeeds
-make test                     # Verify existing tests pass
+make test                     # Verify unit tests pass
+make test-integration         # Verify pattern integration tests pass
 make lint                     # Verify no lint errors
 ```
 
@@ -134,7 +135,8 @@ Write the minimum code to make tests pass. No more, no less.
 ```bash
 go test -v ./internal/<pkg>/... -run TestFeatureName
 make lint
-make test     # Ensure no regressions
+make test                     # Ensure no unit test regressions
+make test-integration         # Ensure no integration regressions
 ```
 
 **Gate:** All tests must pass. Lint must pass.
@@ -170,6 +172,7 @@ Improve code quality without changing behavior.
 **Verify No Regression:**
 ```bash
 make test
+make test-integration
 make lint
 ```
 
@@ -187,9 +190,10 @@ Submit the work for review.
 
 **Pre-PR Checklist:**
 ```bash
-make test                     # All tests pass
+make test                     # All unit tests pass
 make lint                     # No lint errors
 make test-integration         # Pattern integration tests pass
+make test-integration-all     # Full integration tests pass (requires Ollama + Claude)
 git log --oneline main..HEAD  # Review commits
 ```
 

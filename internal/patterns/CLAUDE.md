@@ -3,7 +3,7 @@
 <!-- AUTO-MANAGED: module-description -->
 ## Purpose
 
-Regex-based threat pattern matching engine. Layer 1 in the detection pipeline - fast, deterministic matching against 93 patterns covering technical threats (T1-T9) including prompt injection (T5).
+Regex-based threat pattern matching engine. Layer 1 in the detection pipeline - fast, deterministic matching against 97 patterns covering technical threats (T1-T9) including prompt injection (T5) and SSRF (T1).
 
 <!-- END AUTO-MANAGED -->
 
@@ -14,7 +14,7 @@ Regex-based threat pattern matching engine. Layer 1 in the detection pipeline - 
 patterns/
 ├── matcher.go        # Pattern matching engine
 ├── matcher_test.go   # Test coverage
-└── patterns.yaml     # Embedded pattern definitions (93 patterns)
+└── patterns.yaml     # Embedded pattern definitions (97 patterns)
 ```
 
 **Key Types:**
@@ -26,7 +26,7 @@ patterns/
 **Pattern Categories:**
 | Category | Description | Count |
 |----------|-------------|-------|
-| T1 | Network exfiltration | 3 |
+| T1 | Network exfiltration & SSRF | 7 |
 | T2 | Credential access | 7 |
 | T3 | Command injection | 5+ |
 | T4 | Filesystem attacks | 5+ |
@@ -65,6 +65,9 @@ patterns:
 - Returns all matching patterns (not short-circuit)
 - `HighestSeverity()` helper for prioritization
 - Extraction patterns capture named groups
+- Case-insensitive patterns use `(?i)` prefix (e.g., GCP metadata pattern T1-005)
+- Multiline patterns use `(?m)` flag to enable start-of-line ^ matching (e.g., T5-003 system: override)
+- Path patterns without anchors match anywhere in content (e.g., T4-001 /etc/ matches mid-command)
 
 <!-- END AUTO-MANAGED -->
 

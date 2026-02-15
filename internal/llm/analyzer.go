@@ -26,6 +26,8 @@ type Analyzer interface {
 	IsAvailable() bool
 }
 
+const maxResponseBodySize = 1 << 20 // 1MB
+
 // LlamaGuardAnalyzer uses llama-guard3 via Ollama for content safety analysis.
 type LlamaGuardAnalyzer struct {
 	endpoint string
@@ -46,9 +48,7 @@ func NewLlamaGuardAnalyzer(endpoint, model string) *LlamaGuardAnalyzer {
 	return &LlamaGuardAnalyzer{
 		endpoint: endpoint,
 		model:    model,
-		client: &http.Client{
-			Timeout: 30 * time.Second,
-		},
+		client:   &http.Client{},
 	}
 }
 
@@ -97,15 +97,15 @@ func (a *LlamaGuardAnalyzer) Analyze(ctx context.Context, content string) (*Resu
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodySize))
 		return nil, fmt.Errorf("ollama returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var chatResp chatResponse
-	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseBodySize)).Decode(&chatResp); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 
@@ -119,7 +119,7 @@ func (a *LlamaGuardAnalyzer) parseResponse(content string) *Result {
 	lines := strings.Split(content, "\n")
 
 	if len(lines) == 0 {
-		return &Result{Safe: true, Confidence: 0.5}
+		return &Result{Safe: false, Confidence: 0.0}
 	}
 
 	firstLine := strings.TrimSpace(strings.ToLower(lines[0]))
@@ -156,8 +156,8 @@ func (a *LlamaGuardAnalyzer) parseResponse(content string) *Result {
 		return result
 	}
 
-	// Unknown response, treat as safe with low confidence
-	return &Result{Safe: true, Confidence: 0.3}
+	// Unknown response, default to unsafe
+	return &Result{Safe: false, Confidence: 0.0}
 }
 
 // tagsResponse represents the Ollama tags API response.
@@ -181,14 +181,14 @@ func (a *LlamaGuardAnalyzer) IsAvailable() bool {
 	if err != nil {
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return false
 	}
 
 	var tags tagsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&tags); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseBodySize)).Decode(&tags); err != nil {
 		return false
 	}
 

@@ -56,11 +56,16 @@ Filter the fetched issues to only those relevant to the changes. An issue is rel
 
 Discard all other issues. Produce a short list of relevant issues (number, title, one-line summary of relevance) to pass to reviewers. If no issues are relevant, note "No related open issues" and skip issue context in reviewer prompts.
 
+**Build Known Issues Exclusion List:**
+For each relevant open issue, extract the core problem it describes (the bug, gap, missing feature, or vulnerability). This becomes the **exclusion list** - reviewers MUST NOT report findings that are already covered by these open issues. The purpose of the review is to catch NEW problems, not re-report known ones.
+
 ---
 
 ## Phase 2: Parallel Specialized Review
 
 Launch these four reviewers in parallel using the Task tool. Each reviewer focuses on their specialty.
+
+**IMPORTANT - Known Issue Exclusion:** Every reviewer prompt MUST include the exclusion list from Phase 1. Reviewers must NOT report findings that match problems already tracked by open GitHub issues. The review's purpose is to surface NEW issues only.
 
 ### Reviewer 1: Security Review - Paranoid Sentinel (CRITICAL)
 
@@ -75,15 +80,17 @@ Review the following code changes for security vulnerabilities. Focus on:
 4. Input validation at boundaries
 5. Information leakage in errors
 
+IMPORTANT: Do NOT report findings that are already covered by the open GitHub issues listed below.
+Only report NEW problems not already tracked. If a finding overlaps with a known issue, skip it.
+
 Changed files:
 <list the files from Phase 1>
 
 Diff content:
 <include the diff from Phase 1>
 
-Related open issues:
-<include relevant issues from Phase 1, or "None" if no issues relate to these changes>
-Flag if any issue describes a vulnerability or gap that these changes fail to address.
+Known open issues (DO NOT re-report these):
+<include relevant issues from Phase 1 with number, title, and core problem summary, or "None">
 ```
 
 The paranoid-sentinel will provide:
@@ -104,6 +111,8 @@ The paranoid-sentinel will provide:
 - Import grouping (stdlib, third-party, local)
 - Interface design (defined where consumed)
 
+Do NOT report findings already covered by open GitHub issues (include the exclusion list in the prompt).
+
 **Severity:** Usually Minor unless affecting maintainability.
 
 ### Reviewer 3: Testing Review
@@ -115,11 +124,12 @@ The paranoid-sentinel will provide:
 - Edge cases and boundary conditions
 - Mock usage appropriate
 - Integration test coverage if applicable
-- Open issues requesting test improvements or reporting test gaps
+
+Do NOT report findings already covered by open GitHub issues (include the exclusion list in the prompt). This includes issues requesting test improvements or reporting test gaps - if an issue already tracks it, skip it.
 
 **Severity:** Missing tests for security code is Major.
 
-### Reviewer 4: Architecture & Issue Review
+### Reviewer 4: Architecture Review
 
 **Focus Areas:**
 - Package boundaries respected
@@ -127,23 +137,23 @@ The paranoid-sentinel will provide:
 - YAGNI violations (over-engineering)
 - Detection pipeline integration correct
 - Configuration handling appropriate
-- Open GitHub issues related to changed files or functionality
-- Whether changes partially address, fully resolve, or conflict with open issues
 
-**Severity:** Usually Minor unless breaking architecture. Unaddressed issues in changed areas are Major.
+Do NOT report findings already covered by open GitHub issues (include the exclusion list in the prompt). Do NOT flag "unaddressed issues" - if an open issue exists, it is already tracked and does not belong in this review.
+
+**Severity:** Usually Minor unless breaking architecture.
 
 ### Launching Reviewers
 
 Use the Task tool to launch reviewers in parallel:
 
 ```
-Task(subagent_type="paranoid-sentinel", prompt="Review these changes for security: <diff> Related issues: <issues>")
-Task(subagent_type="general-purpose", prompt="Review Go standards: <diff>")
-Task(subagent_type="general-purpose", prompt="Review test coverage: <diff> Related issues: <issues>")
-Task(subagent_type="general-purpose", prompt="Review architecture and issue coverage: <diff> Open issues: <issues>")
+Task(subagent_type="paranoid-sentinel", prompt="Review these changes for security: <diff> Known open issues (DO NOT re-report): <issues>")
+Task(subagent_type="general-purpose", prompt="Review Go standards: <diff> Known open issues (DO NOT re-report): <issues>")
+Task(subagent_type="general-purpose", prompt="Review test coverage: <diff> Known open issues (DO NOT re-report): <issues>")
+Task(subagent_type="general-purpose", prompt="Review architecture: <diff> Known open issues (DO NOT re-report): <issues>")
 ```
 
-Include relevant open GitHub issues (from Phase 1) in prompts for reviewers 1, 3, and 4. Reviewer 2 (Go standards) does not need issue context.
+Include the exclusion list from Phase 1 in ALL reviewer prompts. Each prompt must contain: "Do NOT report findings that are already covered by these known open issues. Only report NEW problems."
 
 Wait for all reviewers to complete before proceeding to Phase 3.
 
@@ -161,6 +171,9 @@ Consolidate findings from all reviewers into a structured report.
 | **Major** | Missing error handling, missing tests, significant issues | Should fix |
 | **Minor** | Style, docs, minor improvements | Nice to fix |
 
+**Deduplication Step:**
+Before writing the report, compare every reviewer finding against the exclusion list from Phase 1. Drop any finding where the core problem is already tracked by an open GitHub issue. If a reviewer reported something that overlaps with a known issue despite instructions, remove it here.
+
 **Report Format:**
 ```
 ## Code Review Summary
@@ -175,18 +188,15 @@ Consolidate findings from all reviewers into a structured report.
 ### Minor Issues
 - [ ] Issue 1: [file:line] Description
 
-### Issue Cross-Reference
-- [ ] #N: Issue title - status (addressed/partially addressed/not addressed/conflicts)
+### Excluded (Already Tracked)
+Issues filtered out because they match open GitHub issues:
+- #N: Issue title - finding that was excluded
 
 ### Positive Observations
 - Good: Description of well-done aspects
 ```
 
-When cross-referencing issues:
-- **Addressed**: Changes fully resolve the issue - note this in the report
-- **Partially addressed**: Changes touch related code but don't fully resolve - flag remaining work
-- **Not addressed**: Open issue affects changed files but isn't handled - flag as Major if security-related
-- **Conflicts**: Changes may regress or conflict with an open issue - flag as Critical
+The "Excluded" section provides transparency about what was filtered. If no findings were excluded, omit this section.
 
 ---
 
@@ -205,6 +215,7 @@ Determine if the code can proceed.
 make test                    # Must pass
 make lint                    # Must pass
 make test-integration        # Should pass
+make test-integration-all    # Full integration (requires Ollama + Claude)
 ```
 
 **Output Decision:**
@@ -234,7 +245,9 @@ If the user requests fixes, apply them systematically.
 
 **After all fixes:**
 ```bash
-make test                    # Full test suite
+make test                    # Unit tests
+make test-integration        # Pattern integration tests
+make test-integration-all    # Full integration tests
 make lint                    # Full lint
 ```
 

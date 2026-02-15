@@ -1,12 +1,13 @@
 module github.com/severity1/open-guard-engine
 
-go 1.22
+go 1.24.0
 
 require (
 	github.com/google/uuid v1.6.0
 	github.com/severity1/claude-agent-sdk-go v0.6.12
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
+	golang.org/x/text v0.34.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
