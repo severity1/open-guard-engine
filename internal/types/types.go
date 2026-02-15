@@ -78,7 +78,8 @@ const (
 	ThreatCategoryPersistence     ThreatCategory = "T7" // Persistence mechanisms
 	ThreatCategoryRecon           ThreatCategory = "T8" // Reconnaissance
 	ThreatCategoryOutput          ThreatCategory = "T9"      // Output monitoring (leaked prompts, credentials)
-	ThreatCategoryUnknown         ThreatCategory = "unknown" // Analysis unavailable or unclassified
+	ThreatCategoryUnknown         ThreatCategory = "unknown"      // Unclassified threat (analysis ran, category unrecognized)
+	ThreatCategoryUnavailable     ThreatCategory = "unavailable"  // Analysis unavailable (service error)
 )
 
 // Content safety categories (detected via llama-guard3)
@@ -128,7 +129,8 @@ func (t ThreatCategory) Description() string {
 		ThreatCategoryPersistence:     "Persistence mechanism",
 		ThreatCategoryRecon:           "Reconnaissance",
 		ThreatCategoryOutput:          "Output monitoring",
-		ThreatCategoryUnknown:         "Analysis unavailable",
+		ThreatCategoryUnknown:         "Unclassified threat",
+		ThreatCategoryUnavailable:     "Analysis unavailable",
 		// Content safety (S1-S13)
 		SafetyCategoryViolentCrimes:     "Violent crimes",
 		SafetyCategoryNonViolentCrimes:  "Non-violent crimes",
@@ -171,7 +173,8 @@ var validThreatCategories = map[string]ThreatCategory{
 	"T7":  ThreatCategoryPersistence,
 	"T8":  ThreatCategoryRecon,
 	"T9":      ThreatCategoryOutput,
-	"UNKNOWN": ThreatCategoryUnknown,
+	"UNKNOWN":      ThreatCategoryUnknown,
+	"UNAVAILABLE":  ThreatCategoryUnavailable,
 	"S1":  SafetyCategoryViolentCrimes,
 	"S2":  SafetyCategoryNonViolentCrimes,
 	"S3":  SafetyCategorySexCrimes,

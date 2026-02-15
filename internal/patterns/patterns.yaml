@@ -148,7 +148,7 @@ patterns:
     name: etc_write
     description: Writing to /etc directory
     severity: critical
-    pattern: '^/etc/'
+    pattern: '/etc/'
 
   - id: T4-002
     category: T4
@@ -191,7 +191,7 @@ patterns:
     name: system_override
     description: Attempt to override system prompt
     severity: critical
-    pattern: '(?i)^system:\s+'
+    pattern: '(?im)^system:\s+'
 
   - id: T5-004
     category: T5

@@ -508,7 +508,7 @@ func TestThreatCategoryUnknown(t *testing.T) {
 	})
 
 	t.Run("Description", func(t *testing.T) {
-		assert.Equal(t, "Analysis unavailable", ThreatCategoryUnknown.Description())
+		assert.Equal(t, "Unclassified threat", ThreatCategoryUnknown.Description())
 	})
 
 	t.Run("IsSafetyCategory", func(t *testing.T) {
@@ -523,6 +523,30 @@ func TestThreatCategoryUnknown(t *testing.T) {
 		cat, err := ParseThreatCategory("unknown")
 		require.NoError(t, err)
 		assert.Equal(t, ThreatCategoryUnknown, cat)
+	})
+}
+
+func TestThreatCategoryUnavailable(t *testing.T) {
+	t.Run("String", func(t *testing.T) {
+		assert.Equal(t, "unavailable", ThreatCategoryUnavailable.String())
+	})
+
+	t.Run("Description", func(t *testing.T) {
+		assert.Equal(t, "Analysis unavailable", ThreatCategoryUnavailable.Description())
+	})
+
+	t.Run("IsSafetyCategory", func(t *testing.T) {
+		assert.False(t, ThreatCategoryUnavailable.IsSafetyCategory())
+	})
+
+	t.Run("IsThreatCategory", func(t *testing.T) {
+		assert.False(t, ThreatCategoryUnavailable.IsThreatCategory())
+	})
+
+	t.Run("ParseThreatCategory", func(t *testing.T) {
+		cat, err := ParseThreatCategory("unavailable")
+		require.NoError(t, err)
+		assert.Equal(t, ThreatCategoryUnavailable, cat)
 	})
 }
 

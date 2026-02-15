@@ -613,10 +613,10 @@ func TestHandleAnalysisError(t *testing.T) {
 			wantNil: true,
 		},
 		{
-			name:           "LLM source with unknown category",
+			name:           "LLM source with unavailable category",
 			mode:           config.ModeConfirm,
 			source:         types.DetectionSourceLLM,
-			category:       types.ThreatCategoryUnknown,
+			category:       types.ThreatCategoryUnavailable,
 			wantNil:        false,
 			wantDecision:   types.DecisionConfirm,
 			wantThreat:     types.ThreatLevelMedium,

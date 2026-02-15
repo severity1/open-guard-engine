@@ -29,3 +29,6 @@ func (m *MockAnalyzer) Analyze(ctx context.Context, content string) (*Result, er
 func (m *MockAnalyzer) IsAvailable() bool {
 	return m.Available
 }
+
+// Compile-time interface satisfaction check.
+var _ Analyzer = (*MockAnalyzer)(nil)

@@ -26,6 +26,8 @@ type Analyzer interface {
 	IsAvailable() bool
 }
 
+const maxResponseBodySize = 1 << 20 // 1MB
+
 // LlamaGuardAnalyzer uses llama-guard3 via Ollama for content safety analysis.
 type LlamaGuardAnalyzer struct {
 	endpoint string
@@ -98,12 +100,12 @@ func (a *LlamaGuardAnalyzer) Analyze(ctx context.Context, content string) (*Resu
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 1MB limit on error body
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodySize))
 		return nil, fmt.Errorf("ollama returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var chatResp chatResponse
-	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseBodySize)).Decode(&chatResp); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 
@@ -186,7 +188,7 @@ func (a *LlamaGuardAnalyzer) IsAvailable() bool {
 	}
 
 	var tags tagsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&tags); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseBodySize)).Decode(&tags); err != nil {
 		return false
 	}
 

@@ -462,12 +462,22 @@ func TestDetector_ShortBase64Payload(t *testing.T) {
 			content:    "Execute: YnlwYXNz", // base64("bypass"), 8 chars
 			suspicious: true,
 		},
+		{
+			name:       "short base64 hello (not suspicious)",
+			content:    "Decode: aGVsbG8=", // base64("hello"), 8 chars
+			suspicious: false,
+		},
+		{
+			name:       "short base64 world (not suspicious)",
+			content:    "Run: d29ybGQ=", // base64("world"), 8 chars
+			suspicious: false,
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			result := d.Detect(tc.content)
-			assert.True(t, result.Suspicious, "expected Suspicious for short base64 injection payload")
+			assert.Equal(t, tc.suspicious, result.Suspicious, "content: %s", tc.content)
 		})
 	}
 }

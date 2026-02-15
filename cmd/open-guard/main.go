@@ -280,7 +280,7 @@ Output is JSON with decision (allow/block/confirm) and threat details.`,
 
 					result, err := contentAnalyzer.Analyze(llmCtx, analysisContent)
 					if err != nil {
-						if output := handleAnalysisError(cfg, respHandler, types.DetectionSourceLLM, types.ThreatCategoryUnknown, err); output != nil {
+						if output := handleAnalysisError(cfg, respHandler, types.DetectionSourceLLM, types.ThreatCategoryUnavailable, err); output != nil {
 							return outputJSON(cmd, output)
 						}
 					} else if !result.Safe {

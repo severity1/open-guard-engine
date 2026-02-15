@@ -250,10 +250,11 @@ func parseClaudeResponse(response string) (*Result, error) {
 // extractInjectionResult parses an injection response starting from the
 // "INJECTION" keyword and returns a Result with the extracted reason.
 func extractInjectionResult(response string) *Result {
-	reason := strings.TrimPrefix(response, "INJECTION")
-	reason = strings.TrimPrefix(reason, ":")
-	reason = strings.TrimPrefix(strings.ToUpper(reason), "INJECTION")
-	reason = strings.TrimPrefix(reason, ":")
+	// Strip "INJECTION" prefix case-insensitively, preserving reason casing
+	if strings.HasPrefix(strings.ToUpper(response), "INJECTION") {
+		response = response[len("INJECTION"):]
+	}
+	reason := strings.TrimLeft(response, ":")
 	reason = strings.TrimSpace(reason)
 
 	if reason == "" {

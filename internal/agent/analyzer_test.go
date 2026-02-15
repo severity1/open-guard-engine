@@ -235,11 +235,11 @@ func TestParseClaudeResponse_Comprehensive(t *testing.T) {
 		// Injection responses
 		{"INJECTION uppercase", "INJECTION", false, "detected by semantic analysis", false},
 		{"injection lowercase", "injection", false, "detected by semantic analysis", false},
-		{"INJECTION with colon reason", "INJECTION: Attempts to override instructions", false, "ATTEMPTS TO OVERRIDE INSTRUCTIONS", false},
+		{"INJECTION with colon reason", "INJECTION: Attempts to override instructions", false, "Attempts to override instructions", false},
 		{"INJECTION with whitespace", "  INJECTION  ", false, "detected by semantic analysis", false},
-		{"injection with reason", "injection: bypass security", false, "BYPASS SECURITY", false},
-		{"INJECTION multiline", "INJECTION\nWith extra details", false, "WITH EXTRA DETAILS", false},
-		{"INJECTION double colon", "INJECTION::reason", false, "REASON", false},
+		{"injection with reason", "injection: bypass security", false, "bypass security", false},
+		{"INJECTION multiline", "INJECTION\nWith extra details", false, "With extra details", false},
+		{"INJECTION double colon", "INJECTION::reason", false, "reason", false},
 
 		// Error cases
 		{"empty response", "", false, "", true},
@@ -250,9 +250,9 @@ func TestParseClaudeResponse_Comprehensive(t *testing.T) {
 		{"SAFE keyword in body", "Based on my analysis, this is SAFE", true, "", false},
 		{"SAFE on later line", "The input appears benign.\n\nSAFE", true, "", false},
 		{"SAFE with verbose preamble", "Let me analyze this carefully.\n\nSAFE", true, "", false},
-		{"INJECTION keyword in body", "I believe this is an INJECTION: bypass attempt", false, "BYPASS ATTEMPT", false},
-		{"INJECTION on later line", "After review:\nINJECTION: attempts to override", false, "ATTEMPTS TO OVERRIDE", false},
-		{"INJECTION takes priority over SAFE", "This mentions SAFE but is really INJECTION: sneaky", false, "SNEAKY", false},
+		{"INJECTION keyword in body", "I believe this is an INJECTION: bypass attempt", false, "bypass attempt", false},
+		{"INJECTION on later line", "After review:\nINJECTION: attempts to override", false, "attempts to override", false},
+		{"INJECTION takes priority over SAFE", "This mentions SAFE but is really INJECTION: sneaky", false, "sneaky", false},
 		// Error cases - no keywords
 		{"no keywords verbose", "I don't know what to say about this input", false, "", true},
 	}
